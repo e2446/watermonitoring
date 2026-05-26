@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redlink Water Meter Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--bg2:#13161e;--bg3:#1a1e28;--border:#252a38;--border2:#2e3447;
+  --text:#e8eaf0;--muted:#6b7399;--muted2:#4a5175;
+  --accent:#00d4ff;--green:#00e676;--green2:#00b359;--red:#ff4757;
+  --amber:#ffb300;--blue:#448aff;--purple:#b388ff;
+  --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* SIDEBAR */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100}
+.sidebar-logo{padding:18px 18px 14px;border-bottom:1px solid var(--border)}
+.logo-mark{display:flex;align-items:center;gap:10px;margin-bottom:3px}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--blue));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.logo-text{font-family:var(--mono);font-size:13px;font-weight:700}
+.logo-sub{font-size:10px;color:var(--muted);margin-left:40px}
+.nav{flex:1;padding:10px 0;overflow-y:auto}
+.nav-section{padding:14px 16px 5px;font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px;font-size:13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;border-left:2px solid transparent;transition:all .15s;font-family:var(--sans)}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--accent);background:rgba(0,212,255,.07);border-left-color:var(--accent)}
+.nav-item svg{width:15px;height:15px;flex-shrink:0}
+.nav-sub .nav-item{padding-left:38px;font-size:12px}
+.nav-badge{margin-left:auto;background:var(--red);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;min-width:18px;text-align:center}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{box-shadow:0 0 0 5px rgba(0,230,118,0)}}
+.pulse.live{animation:pulse 2s infinite}
+.pulse.off{background:var(--red)}
+
+/* MAIN */
+.main{margin-left:220px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.page-title{font-size:15px;font-weight:600}
+.page-sub{font-size:11px;color:var(--muted)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.clock{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.cdwn{font-size:11px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 9px;font-family:var(--mono)}
+.rbtn{display:flex;align-items:center;gap:6px;padding:6px 13px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);color:var(--accent);border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.rbtn:hover{background:rgba(0,212,255,.18)}.rbtn:disabled{opacity:.5;cursor:not-allowed}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(0,212,255,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+
+.content{padding:20px 22px;flex:1}
+.ebar{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.25);color:#ff8a93;padding:10px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;display:none}
+
+/* STAT CARDS */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.blue::before{background:linear-gradient(90deg,var(--blue),var(--accent))}
+.sc.green::before{background:var(--green)}
+.sc.red::before{background:var(--red)}
+.sc.amber::before{background:var(--amber)}
+.sc.purple::before{background:var(--purple)}
+.sc.orange::before{background:#ff6b35}
+.sc-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px}
+.sc-value{font-family:var(--mono);font-size:26px;font-weight:700;line-height:1}
+.sc.blue .sc-value{color:var(--accent)}.sc.green .sc-value{color:var(--green)}.sc.red .sc-value{color:var(--red)}
+.sc.amber .sc-value{color:var(--amber)}.sc.purple .sc-value{color:var(--purple)}.sc.orange .sc-value{color:#ff6b35}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.sc-app{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);margin-top:4px}
+
+/* APP TABS */
+.app-tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.app-tab{padding:7px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--muted);transition:all .15s;font-family:var(--sans)}
+.app-tab:hover{color:var(--text)}.app-tab.active{background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.3);color:var(--accent)}
+.app-tab-count{display:inline-block;background:var(--bg3);color:var(--muted);font-size:10px;border-radius:99px;padding:1px 6px;margin-left:4px}
+.app-tab.active .app-tab-count{background:rgba(0,212,255,.15);color:var(--accent)}
+
+/* FILTER TABS */
+.filter-tabs{display:flex;gap:3px;margin-bottom:14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:3px;width:fit-content}
+.ftab{padding:5px 14px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;font-family:var(--sans)}
+.ftab:hover{color:var(--text)}.ftab.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.ftab-count{font-size:10px;opacity:.7;margin-left:3px}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px}
+.toolbar-left{display:flex;align-items:center;gap:10px}
+.toolbar-right{display:flex;align-items:center;gap:8px}
+.search-wrap{position:relative}
+.search{padding:7px 13px 7px 34px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg2);color:var(--text);width:210px;outline:none;font-family:var(--sans)}
+.search::placeholder{color:var(--muted2)}.search:focus{border-color:rgba(0,212,255,.4)}
+.si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted2)}
+.lu{font-size:11px;color:var(--muted)}
+.view-toggle{display:flex;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:2px;gap:2px}
+.vbtn{padding:5px 11px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;font-family:var(--sans)}
+.vbtn.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+
+/* METER CARDS */
+.meter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:13px}
+.meter-card{background:var(--bg2);border:1px solid var(--border);border-radius:11px;overflow:hidden;transition:border-color .2s,transform .15s;cursor:pointer}
+.meter-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.meter-card.zero-reading{border-color:rgba(255,107,53,.3)}
+.meter-card.zero-reading .meter-head{background:rgba(255,107,53,.06)}
+.meter-head{display:flex;align-items:center;justify-content:space-between;padding:11px 13px 9px}
+.meter-sn{font-family:var(--mono);font-size:12px;font-weight:700}.meter-sn span{color:var(--muted);font-weight:400}
+.status-pill{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px}
+.sp-on{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.sp-off{background:rgba(255,71,87,.1);color:var(--red);border:1px solid rgba(255,71,87,.2)}
+.sp-stale{background:rgba(255,179,0,.1);color:var(--amber);border:1px solid rgba(255,179,0,.2)}
+.sp-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.meter-eui{font-family:var(--mono);font-size:10px;color:var(--muted);padding:0 13px 7px}
+.meter-reading-block{padding:10px 13px 10px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:6px;justify-content:space-between}
+.reading-val{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1}
+.reading-val.zero{color:var(--amber)}
+.reading-unit{font-size:13px;color:var(--muted);font-weight:400}
+.zero-tag{background:rgba(255,107,53,.15);color:#ff6b35;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid rgba(255,107,53,.3)}
+.meter-stats{padding:9px 13px 11px;display:grid;gap:6px}
+.sr{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.sr-label{color:var(--muted);display:flex;align-items:center;gap:5px}
+.sr-label svg{width:12px;height:12px;opacity:.6}
+.sr-val{color:var(--text);font-weight:500}
+.bwrap{display:flex;align-items:center;gap:6px}
+.bbar{width:40px;height:5px;background:var(--border2);border-radius:3px;overflow:hidden}
+.bfill{height:100%;border-radius:3px}
+.rg{color:var(--green)}.ro{color:var(--amber)}.rr{color:var(--red)}
+.tval{font-family:var(--mono);font-size:11px;color:var(--muted2)}
+.vo{color:var(--green);font-weight:600}.vc{color:var(--red);font-weight:600}
+.meter-footer{padding:8px 13px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}
+.hist-btn{font-size:11px;color:var(--accent);background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);border-radius:5px;padding:3px 10px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.hist-btn:hover{background:rgba(0,212,255,.16)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.meter-card{animation:fadeIn .25s ease both}
+
+/* TABLE */
+.tcard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.twrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--bg3);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:10px 12px;vertical-align:middle}
+.eui-td{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.sn-td{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700}
+.zero-row td:nth-child(4){color:var(--amber);font-weight:700}
+.empty{text-align:center;padding:50px;color:var(--muted);font-size:13px}
+
+/* MODAL - HISTORY */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:min(860px,95vw);max-height:90vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:15px;font-weight:600}
+.modal-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.modal-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.modal-close:hover{color:var(--text);border-color:var(--border2)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.chart-tabs{display:flex;gap:3px;margin-bottom:16px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:2px;width:fit-content}
+.ctab{padding:5px 13px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:none;color:var(--muted);transition:all .15s;font-family:var(--sans)}
+.ctab.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.chart-wrap{position:relative;height:280px;margin-bottom:16px}
+.hist-table-wrap{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+.hist-table{width:100%;border-collapse:collapse;font-size:12px}
+.hist-table th{background:var(--bg3);padding:8px 12px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;position:sticky;top:0}
+.hist-table td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+.hist-table tr:last-child td{border-bottom:none}
+.hist-table tr:hover td{background:var(--bg3)}
+.no-history{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+.dl-btn{display:flex;align-items:center;gap:6px;padding:6px 13px;background:rgba(68,138,255,.1);border:1px solid rgba(68,138,255,.25);color:var(--blue);border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.dl-btn:hover{background:rgba(68,138,255,.18)}
+
+/* TRENDS PAGE */
+.trends-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px}
+.trend-card{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:16px}
+.trend-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.trend-sub{font-size:11px;color:var(--muted);margin-bottom:14px}
+.trend-chart-wrap{position:relative;height:160px}
+
+/* SECTION HEADER */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-size:14px;font-weight:600}
+.section-badge{font-size:11px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);border-radius:99px;padding:2px 10px}
+
+/* APP SECTION HEADER in history */
+.app-section-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 0 12px;border-bottom:1px solid var(--border);margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.app-section-title{display:flex;align-items:center;gap:8px}
+
+/* PERIOD BAR */
+.period-bar{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.pbtn{padding:7px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--muted);transition:all .15s;font-family:var(--sans)}
+.pbtn:hover{color:var(--text)}.pbtn.active{background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.3);color:var(--accent)}
+
+/* CONSUMPTION SUMMARY */
+.cons-summary-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:18px;overflow:hidden}
+.cons-summary-header{padding:10px 16px;background:var(--bg3);border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between}
+.cons-summary-body{display:grid;grid-template-columns:1fr;gap:0}
+/* Grand total row spans full width */
+.cons-summary-body > .cons-row{border-bottom:1px solid var(--border)}
+/* App groups sit side by side */
+.cons-app-group{border-right:1px solid var(--border);display:flex;flex-direction:column}
+.cons-app-group:last-child{border-right:none}
+.cons-app-header{padding:8px 14px;background:rgba(0,212,255,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cons-meter-row{padding:8px 14px;border-bottom:1px solid var(--border)}
+.cons-meter-row:last-child{border-bottom:none}
+/* Side-by-side app groups */
+.cons-apps-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.cons-row{padding:10px 16px}
+.cons-sn{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px}
+.cons-val{font-size:15px;font-weight:600;margin-bottom:2px}
+.cons-sub{font-size:10px;color:var(--muted)}
+.zero-alert{background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.25);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px}
+.zero-alert-icon{font-size:18px}
+.zero-alert-text{color:#ff8c5a}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">💧</div>
+      <div class="logo-text">Redlink</div>
+    </div>
+    <div class="logo-sub">LoRaWAN Monitoring</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Main</div>
+    <button class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </button>
+    <div class="nav-section">Water Meters</div>
+    <button class="nav-item" onclick="showPage('meters',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/><path d="M12 6v6l4 2"/></svg>
+      List of Meters
+    </button>
+    <div class="nav-sub">
+      <button class="nav-item" onclick="showPage('network',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+        Network Status
+        <span class="nav-badge" id="offline-badge">0</span>
+      </button>
+    </div>
+    <div class="nav-section">Consumption</div>
+    <button class="nav-item" onclick="showPage('history-page',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Consumption History
+    </button>
+    <button class="nav-item" onclick="showPage('trends',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Trends
+    </button>
+    <div class="nav-sub">
+      <button class="nav-item" onclick="showPage('download',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </button>
+    </div>
+    <div class="nav-section">Billing</div>
+    <a class="nav-item" href="billing.html" style="color:var(--amber)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Water Billing
+    </a>
+    <div class="nav-section">Alerts</div>
+    <button class="nav-item" onclick="showPage('alarms',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Alarms
+      <span class="nav-badge" id="alarm-badge">0</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="pulse live" id="status-dot"></div>
+    <span id="conn-status">Connecting…</span>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title" id="page-title">Dashboard</div>
+      <div class="page-sub">Redlink Organization · LoRaWAN Monitoring</div>
+    </div>
+    <div class="topbar-right">
+      <span class="clock" id="clock"></span>
+      <span class="cdwn" id="cdwn"></span>
+      <button class="rbtn" id="rbtn" onclick="manualRefresh()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="ebar" id="ebar">⚠️ Cannot reach proxy server. Run <strong>node server.js</strong> then open <strong>http://localhost:3000</strong></div>
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard">
+      <div class="stat-row">
+        <div class="sc blue"><div class="sc-label">Total meters</div><div class="sc-value" id="m-total">—</div></div>
+        <div class="sc green"><div class="sc-label">Online (&lt;4h)</div><div class="sc-value" id="m-online">—</div></div>
+        <div class="sc amber"><div class="sc-label">Stale (4h–48h)</div><div class="sc-value" id="m-stale">—</div></div>
+        <div class="sc red"><div class="sc-label">Offline (&gt;48h)</div><div class="sc-value" id="m-offline">—</div></div>
+        <div class="sc orange"><div class="sc-label">Zero readings</div><div class="sc-value" id="m-zero">—</div></div>
+        <div class="sc purple"><div class="sc-label">Application</div><div class="sc-app" id="m-appname">—</div></div>
+      </div>
+      <div class="app-tabs" id="app-tabs"></div>
+      <div id="zero-alert" style="display:none" class="zero-alert">
+        <span class="zero-alert-icon">⚠️</span>
+        <span class="zero-alert-text" id="zero-alert-text"></span>
+      </div>
+
+
+
+      <div class="filter-tabs">
+        <button class="ftab active" onclick="setFilter('all',this)">All meters<span class="ftab-count" id="fc-all"></span></button>
+        <button class="ftab" onclick="setFilter('active',this)">Online<span class="ftab-count" id="fc-active"></span></button>
+        <button class="ftab" onclick="setFilter('stale',this)">Stale<span class="ftab-count" id="fc-stale"></span></button>
+        <button class="ftab" onclick="setFilter('offline',this)">Offline<span class="ftab-count" id="fc-offline"></span></button>
+        <button class="ftab" onclick="setFilter('zero',this)">Zero reading<span class="ftab-count" id="fc-zero"></span></button>
+        <button class="ftab" onclick="setFilter('alarms',this)">Alarms<span class="ftab-count" id="fc-alarms"></span></button>
+      </div>
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <div class="search-wrap">
+            <svg class="si" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="search" type="text" placeholder="Search meters…" id="search" oninput="renderView()">
+          </div>
+          <span class="lu" id="lu"></span>
+        </div>
+        <div class="toolbar-right">
+          <div class="view-toggle">
+            <button class="vbtn active" id="vbtn-card" onclick="setView('card')">⊞ Cards</button>
+            <button class="vbtn" id="vbtn-table" onclick="setView('table')">☰ Table</button>
+          </div>
+        </div>
+      </div>
+      <div class="meter-grid" id="card-view"></div>
+      <div class="tcard" id="table-view" style="display:none">
+        <div class="twrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- METERS LIST -->
+    <div id="page-meters" style="display:none">
+      <div class="app-tabs" id="meters-app-tabs"></div>
+      <div class="tcard">
+        <div class="twrap"><table><thead id="meters-thead"></thead><tbody id="meters-tbody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- NETWORK STATUS -->
+    <div id="page-network" style="display:none">
+      <div class="stat-row" style="margin-bottom:20px">
+        <div class="sc green"><div class="sc-label">Online</div><div class="sc-value" id="net-online">—</div><div class="sc-sub">Last seen &lt;4h</div></div>
+        <div class="sc amber"><div class="sc-label">Stale</div><div class="sc-value" id="net-stale">—</div><div class="sc-sub">4h – 48h ago</div></div>
+        <div class="sc red"><div class="sc-label">Offline</div><div class="sc-value" id="net-offline">—</div><div class="sc-sub">Last seen &gt;48h</div></div>
+      </div>
+      <div class="section-hdr"><span class="section-title">All Meters — Network Status</span></div>
+      <div class="tcard"><div class="twrap"><table>
+        <thead><tr><th>Serial</th><th>Device EUI</th><th>Application</th><th>Status</th><th>Last seen</th><th>RSSI</th></tr></thead>
+        <tbody id="network-tbody"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- CONSUMPTION HISTORY -->
+    <div id="page-history-page" style="display:none">
+
+      <!-- Period selector -->
+      <div class="period-bar">
+        <button class="pbtn active" onclick="setHistPeriod('today',this)">Today</button>
+        <button class="pbtn" onclick="setHistPeriod('yesterday',this)">Yesterday</button>
+        <button class="pbtn" onclick="setHistPeriod('week',this)">This Week</button>
+        <button class="pbtn" onclick="setHistPeriod('lastweek',this)">Last Week</button>
+        <button class="pbtn" onclick="setHistPeriod('month',this)">This Month</button>
+        <button class="pbtn" onclick="setHistPeriod('all',this)">All Time</button>
+      </div>
+
+      <!-- Summary strip -->
+      <div class="cons-summary-card" style="margin-bottom:18px">
+        <div class="cons-summary-header">
+          <span>📊 Consumption Summary — <span id="hist-period-label">Today</span></span>
+          <span style="font-size:11px;color:var(--muted)" id="hist-period-range"></span>
+        </div>
+        <div id="consumption-summary" class="cons-summary-body">
+          <div style="color:var(--muted);font-size:12px;padding:12px">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Meter cards grouped by app -->
+      <div id="history-meter-list"></div>
+    </div>
+
+    <!-- TRENDS -->
+    <div id="page-trends" style="display:none">
+      <div class="section-hdr">
+        <span class="section-title">Trends — Meter readings over time</span>
+        <div style="display:flex;gap:8px">
+          <select id="trend-period" onchange="renderTrends()" style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px;font-family:var(--sans)">
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="all">All time</option>
+          </select>
+        </div>
+      </div>
+      <div class="trends-grid" id="trends-grid"></div>
+    </div>
+
+    <!-- DOWNLOAD -->
+    <div id="page-download" style="display:none">
+      <div class="section-hdr"><span class="section-title">Consumption Download</span></div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:24px">
+        <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Download consumption history for each meter in CSV format (billing compatible).</p>
+        <div id="download-list" style="display:grid;gap:10px"></div>
+      </div>
+    </div>
+
+    <!-- ALARMS -->
+    <div id="page-alarms" style="display:none">
+      <div class="section-hdr"><span class="section-title">Active Alarms</span><span class="section-badge" id="alarms-count">0 alarms</span></div>
+      <div class="tcard"><div class="twrap"><table>
+        <thead><tr><th>Serial</th><th>Device EUI</th><th>Application</th><th>Error count</th><th>Last seen</th><th>Meter reading</th></tr></thead>
+        <tbody id="alarms-tbody"></tbody>
+      </table></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY MODAL -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="modal-title">Meter History</div>
+        <div class="modal-sub" id="modal-sub"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="dl-btn" onclick="downloadCSV()">⬇ Download CSV</button>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="chart-tabs">
+        <button class="ctab active" onclick="setChartType('line',this)">📈 Line</button>
+        <button class="ctab" onclick="setChartType('bar',this)">📊 Bar</button>
+      </div>
+      <div class="chart-wrap"><canvas id="hist-chart"></canvas></div>
+      <div class="section-hdr" style="margin-top:12px">
+        <span class="section-title" style="font-size:13px">Reading log</span>
+        <span class="section-badge" id="hist-count"></span>
+      </div>
+      <div class="hist-table-wrap">
+        <table class="hist-table">
+          <thead><tr><th>Timestamp</th><th>Meter reading (m³)</th><th>Consumption</th><th>Battery</th><th>RSSI</th><th>Valve</th></tr></thead>
+          <tbody id="hist-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──
+let appData = {}, historyData = {};
+let activeApp = null, currentView = 'card', currentFilter = 'all';
+let cdSecs = 60, cdTimer;
+let modalMeterKey = null, modalChartType = 'line', modalChartInst = null;
+
+// ── CLOCK ──
+// ── PHT CLOCK (UTC+8) ──
+function getPHTDate() {
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utc + 8 * 3600000);
+}
+setInterval(()=>{
+  const pht = getPHTDate();
+  document.getElementById('clock').textContent =
+    pht.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' PHT';
+}, 1000);
+
+// ── PAGES ──
+const allPages = ['dashboard','meters','network','history-page','trends','download','alarms'];
+const pageTitles = {dashboard:'Dashboard',meters:'Water Meters',network:'Network Status','history-page':'Consumption History',trends:'Trends',download:'Download',alarms:'Alarms'};
+function showPage(p, btn) {
+  allPages.forEach(pg => { const el=document.getElementById('page-'+pg); if(el) el.style.display=pg===p?'':'none'; });
+  document.getElementById('page-title').textContent = pageTitles[p]||p;
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(p==='network') renderNetworkPage();
+  if(p==='trends') renderTrends();
+  if(p==='history-page') renderHistoryPage();
+  if(p==='download') renderDownloadList();
+  if(p==='alarms') renderAlarmsPage();
+  if(p==='meters') renderMetersPage();
+}
+
+// ── FETCH ──
+async function fetchData() {
+  try {
+    const [nodesRes, histRes] = await Promise.all([
+      fetch('http://localhost:3000/api/nodes'),
+      fetch('http://localhost:3000/api/history')
+    ]);
+    if(!nodesRes.ok) throw new Error();
+    appData = (await nodesRes.json()).applications || {};
+    historyData = await histRes.json();
+    document.getElementById('ebar').style.display = 'none';
+    document.getElementById('conn-status').textContent = 'Connected';
+    document.getElementById('status-dot').className = 'pulse live';
+    document.getElementById('lu').textContent = 'Updated: ' + getPHTDate().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' PHT';
+    if(!activeApp || !appData[activeApp]) activeApp = Object.keys(appData)[0];
+    buildAppTabs();
+    updateStats();
+    renderView();
+    updateBadges();
+    resetCountdown();
+  } catch(e) {
+    document.getElementById('ebar').style.display = 'block';
+    document.getElementById('conn-status').textContent = 'Offline';
+    document.getElementById('status-dot').className = 'pulse off';
+  }
+}
+
+// ── HELPERS ──
+function allNodes(){ return Object.values(appData).flatMap(a=>a.nodes); }
+// ── STATUS: 3 mutually exclusive states ──
+// Online  = last seen < 4 hours  (LoRa meters typically transmit every 1–3h)
+// Stale   = last seen 4h – 48h   (delayed but not dead)
+// Offline = last seen > 48h OR never seen
+function getStatus(n) {
+  const t = n.lastActive || n.lastUpdate;
+  if (!t) return 'offline';
+  const diff = Date.now() - new Date(t).getTime();
+  if (diff < 4  * 3600000)  return 'online';   // < 4 hours
+  if (diff < 48 * 3600000)  return 'stale';    // 4h – 48h
+  return 'offline';                              // > 48h
+}
+function isOnline(n)  { return getStatus(n) === 'online'; }
+function isStale(n)   { return getStatus(n) === 'stale'; }
+function isOffline(n) { return getStatus(n) === 'offline'; }
+function isZero(n){ return parseFloat(n.meterReading)===0 || n.meterReading===undefined; }
+function rssiCls(v){ const n=parseInt(v); return isNaN(n)?'':n>=-70?'rg':n>=-90?'ro':'rr'; }
+function fmt(t){
+  if(!t) return '—';
+  // If it's already a PHT string (contains +08:00 or PHT), just clean display
+  const s = String(t);
+  if(s.includes('+08:00')) return s.replace('T',' ').replace('+08:00','').substring(0,16);
+  if(s.includes('PHT')) return s.replace('T',' ').substring(0,16);
+  // Otherwise it's from the device (UTC) — convert to PHT for display
+  const d = new Date(t);
+  if(isNaN(d)) return s.substring(0,16);
+  const pht = new Date(d.getTime() + (8*3600000) + d.getTimezoneOffset()*60000);
+  const pad = n => String(n).padStart(2,'0');
+  return `${pht.getFullYear()}-${pad(pht.getMonth()+1)}-${pad(pht.getDate())} ${pad(pht.getHours())}:${pad(pht.getMinutes())}`;
+}
+function battColor(p){ return p>=70?'#00e676':p>=40?'#ffb300':'#ff4757'; }
+
+// ── STATS ──
+function updateStats() {
+  const all = allNodes();
+  const online  = all.filter(isOnline).length;
+  const stale   = all.filter(isStale).length;
+  const offline = all.filter(isOffline).length;
+  const zero    = all.filter(isZero).length;
+  document.getElementById('m-total').textContent   = all.length;
+  document.getElementById('m-online').textContent  = online;
+  document.getElementById('m-stale').textContent   = stale;
+  document.getElementById('m-offline').textContent = offline;
+  document.getElementById('m-zero').textContent    = zero;
+  if(activeApp && appData[activeApp]) document.getElementById('m-appname').textContent = appData[activeApp].name;
+
+  // filter tab counts
+  const cur = appData[activeApp]?.nodes || [];
+  document.getElementById('fc-all').textContent     = cur.length;
+  document.getElementById('fc-active').textContent  = cur.filter(isOnline).length;
+  document.getElementById('fc-stale').textContent   = cur.filter(isStale).length;
+  document.getElementById('fc-offline').textContent = cur.filter(isOffline).length;
+  document.getElementById('fc-zero').textContent    = cur.filter(isZero).length;
+  document.getElementById('fc-alarms').textContent  = cur.filter(n=>parseInt(n.errCount)>0).length;
+
+  // zero alert
+  const curZero = cur.filter(isZero);
+  const zeroAlert = document.getElementById('zero-alert');
+  if(curZero.length > 0) {
+    zeroAlert.style.display='flex';
+    document.getElementById('zero-alert-text').textContent = `${curZero.length} meter${curZero.length>1?'s':''} showing 0.000 m³ — possible no flow, closed valve, or installation issue. SNs: ${curZero.map(n=>n.sn||n.name||'?').join(', ')}`;
+  } else { zeroAlert.style.display='none'; }
+}
+
+function updateBadges() {
+  const all = allNodes();
+  document.getElementById('offline-badge').textContent = all.filter(isOffline).length;
+  document.getElementById('alarm-badge').textContent   = all.filter(n=>parseInt(n.errCount)>0).length;
+}
+
+// ── TABS ──
+function buildAppTabs() {
+  ['app-tabs','meters-app-tabs'].forEach(id=>{
+    const el=document.getElementById(id); if(!el)return;
+    el.innerHTML = Object.entries(appData).map(([id2,app])=>`
+      <button class="app-tab ${id2==activeApp?'active':''}" onclick="switchApp('${id2}')">
+        ${app.name}<span class="app-tab-count">${app.nodes.length}</span>
+      </button>`).join('');
+  });
+}
+
+function switchApp(id) {
+  activeApp = id;
+  document.getElementById('search').value='';
+  document.getElementById('m-appname').textContent = appData[id]?.name||'';
+  buildAppTabs();
+  updateStats();
+  renderView();
+}
+
+// ── FILTER ──
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.ftab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderView();
+}
+
+function applyFilter(nodes) {
+  const q = document.getElementById('search').value.toLowerCase();
+  let filtered = nodes;
+  if(currentFilter==='active')  filtered = filtered.filter(isOnline);
+  else if(currentFilter==='stale')   filtered = filtered.filter(isStale);
+  else if(currentFilter==='offline') filtered = filtered.filter(isOffline);
+  else if(currentFilter==='zero')    filtered = filtered.filter(isZero);
+  else if(currentFilter==='alarms')  filtered = filtered.filter(n=>parseInt(n.errCount)>0);
+  if(q) filtered = filtered.filter(n=>JSON.stringify(n).toLowerCase().includes(q));
+  return filtered;
+}
+
+// ── VIEWS ──
+function setView(v) {
+  currentView=v;
+  document.getElementById('vbtn-card').classList.toggle('active',v==='card');
+  document.getElementById('vbtn-table').classList.toggle('active',v==='table');
+  document.getElementById('card-view').style.display=v==='card'?'':'none';
+  document.getElementById('table-view').style.display=v==='table'?'':'none';
+  renderView();
+}
+
+function renderView() {
+  if(!activeApp||!appData[activeApp]) return;
+  const nodes = applyFilter(appData[activeApp].nodes);
+  if(currentView==='card') renderCards(nodes);
+  else renderTable(nodes);
+}
+
+// ── CARD RENDER ──
+function renderCards(nodes) {
+  const grid = document.getElementById('card-view');
+  if(!nodes.length){grid.innerHTML=`<div class="empty" style="grid-column:1/-1">No meters match this filter.</div>`;return;}
+  grid.innerHTML = nodes.map((n,i)=>{
+    const on=isOnline(n), stale=isStale(n), zero=isZero(n);
+    const sc=on?'sp-on':stale?'sp-stale':'sp-off', st=on?'Online':stale?'Stale':'Offline';
+    const bp=parseInt(n.batteryLevel||n.battery)||0;
+    const bv=parseFloat(n.battery)||0;
+    const bc=battColor(bp);
+    const hasCyble=n.mCUTemp!==undefined;
+    const key=encodeURIComponent(n.sn||n.name||n.devEUI);
+    const readingVal=parseFloat(n.meterReading);
+    const readingStr=!isNaN(readingVal)?readingVal.toFixed(3):'—';
+    return `<div class="meter-card${zero?' zero-reading':''}" style="animation-delay:${(i%8)*.04}s">
+      <div class="meter-head">
+        <div class="meter-sn"><span>SN: </span>${n.sn||n.name||'—'}</div>
+        <div class="status-pill ${sc}"><div class="sp-dot"></div>${st}</div>
+      </div>
+      <div class="meter-eui">${n.devEUI||'—'}</div>
+      <div class="meter-reading-block">
+        <div>
+          <div class="reading-val${zero?' zero':''}">
+            ${readingStr}<span class="reading-unit">m³</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Meter reading</div>
+        </div>
+        ${zero?'<span class="zero-tag">⚠ Zero</span>':''}
+      </div>
+      <div class="meter-stats">
+        <div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Battery</span>
+          <span class="sr-val"><div class="bwrap"><span style="color:var(--muted);font-size:11px">${bv}V</span><div class="bbar"><div class="bfill" style="width:${Math.min(bp,100)}%;background:${bc}"></div></div><span style="color:${bc}">${bp}%</span></div></span></div>
+        <div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6l5 5 5-5 5 5 5-5"/></svg>RSSI / SNR</span>
+          <span class="sr-val"><span class="${rssiCls(n.rssi)}">${n.rssi??'—'} dBm</span><span style="color:var(--muted)"> / </span><span style="color:var(--blue)">${n.snr??'—'} dB</span></span></div>
+        <div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Last data</span><span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span></div>
+        <div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>Transmit</span><span class="tval">${fmt(n.lastUpdate)}</span></div>
+        ${n.valve!==undefined?`<div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12"/><path d="m5 12-2-2 9-5 9 5-2 2"/><path d="M5 12v5l7 3 7-3v-5"/></svg>Valve</span><span class="${n.valve?.toLowerCase()==='open'?'vo':'vc'}">${n.valve||'—'}</span></div>`:''}
+        ${hasCyble?`<div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>Temperature</span><span style="color:var(--amber)">${n.mCUTemp??'—'} °C</span></div>`:''}
+        <div class="sr"><span class="sr-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>Reboot / SW</span><span class="sr-val">${n.rebootCount??'—'} / ${n.softVer||'—'}</span></div>
+      </div>
+      <div class="meter-footer">
+        <button class="hist-btn" onclick="openModal('${key}','${(n.sn||n.name||n.devEUI).replace(/'/g,'')}','${(n.devEUI||'').replace(/'/g,'')}')">📈 History</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── TABLE RENDER ──
+function renderTable(nodes) {
+  const hasCyble = (appData[activeApp]?.nodes||[])[0]?.mCUTemp!==undefined;
+  const cols = [
+    {l:'Serial', f:n=>`<span class="sn-td">${n.sn||n.name||'—'}</span>`},
+    {l:'Device EUI', f:n=>`<span class="eui-td">${n.devEUI||'—'}</span>`},
+    {l:'Status', f:n=>{ const on=isOnline(n); return `<div class="status-pill ${on?'sp-on':'sp-off'}" style="display:inline-flex">${on?'Online':'Offline'}</div>`}},
+    {l:'Meter reading', f:n=>{ const v=parseFloat(n.meterReading); return `<span${isZero(n)?' style="color:var(--amber);font-weight:700"':''}>${!isNaN(v)?v.toFixed(3)+' m³':'—'}${isZero(n)?' ⚠':''}</span>`}},
+    ...(!hasCyble?[
+      {l:'Prepayment', f:n=>n.recharge??'—'},
+      {l:'Valve', f:n=>n.valve?`<span class="${n.valve.toLowerCase()==='open'?'vo':'vc'}">${n.valve}</span>`:'—'},
+    ]:[]),
+    {l:'Battery (V)', f:n=>n.battery??'—'},
+    {l:'Battery (%)', f:n=>{ const p=parseInt(n.batteryLevel||n.battery)||0; const c=battColor(p); return `<div class="bwrap"><div class="bbar"><div class="bfill" style="width:${p}%;background:${c}"></div></div><span style="color:${c}">${p}%</span></div>`}},
+    {l:'RSSI', f:n=>`<span class="${rssiCls(n.rssi)}">${n.rssi??'—'}</span>`},
+    {l:'SNR', f:n=>n.snr??'—'},
+    {l:'Last data', f:n=>`<span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span>`},
+    {l:'Reboot', f:n=>n.rebootCount??'—'},
+    {l:'SW', f:n=>n.softVer||'—'},
+    ...(hasCyble?[{l:'Temp °C', f:n=>`<span style="color:var(--amber)">${n.mCUTemp??'—'}</span>`}]:[]),
+    {l:'History', f:n=>{ const k=encodeURIComponent(n.sn||n.name||n.devEUI); return `<button class="hist-btn" onclick="openModal('${k}','${(n.sn||n.name||n.devEUI).replace(/'/g,'')}','${(n.devEUI||'').replace(/'/g,'')}')">📈</button>`}},
+  ];
+  document.getElementById('thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.l}</th>`).join('')+'</tr>';
+  const tbody=document.getElementById('tbody');
+  if(!nodes.length){tbody.innerHTML=`<tr><td colspan="${cols.length}" class="empty">No meters found.</td></tr>`;return;}
+  tbody.innerHTML=nodes.map(n=>`<tr class="${isZero(n)?'zero-row':''}">`+cols.map(c=>`<td>${c.f(n)}</td>`).join('')+'</tr>').join('');
+}
+
+// ── METERS PAGE ──
+function renderMetersPage() {
+  const all = allNodes();
+  const cols=[
+    {l:'Serial',f:n=>`<span class="sn-td">${n.sn||n.name||'—'}</span>`},
+    {l:'Device EUI',f:n=>`<span class="eui-td">${n.devEUI||'—'}</span>`},
+    {l:'Application',f:n=>n._appName||'—'},
+    {l:'Status',f:n=>{const on=isOnline(n);return `<div class="status-pill ${on?'sp-on':'sp-off'}" style="display:inline-flex">${on?'Online':'Offline'}</div>`}},
+    {l:'Meter reading',f:n=>{const v=parseFloat(n.meterReading);return `<span${isZero(n)?' style="color:var(--amber);font-weight:700"':''}>${!isNaN(v)?v.toFixed(3)+' m³':'—'}</span>`}},
+    {l:'Battery (%)',f:n=>{const p=parseInt(n.batteryLevel||n.battery)||0;const c=battColor(p);return `<span style="color:${c}">${p}%</span>`}},
+    {l:'RSSI',f:n=>`<span class="${rssiCls(n.rssi)}">${n.rssi??'—'}</span>`},
+    {l:'Last data',f:n=>`<span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span>`},
+    {l:'SW ver.',f:n=>n.softVer||'—'},
+  ];
+  document.getElementById('meters-thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.l}</th>`).join('')+'</tr>';
+  document.getElementById('meters-tbody').innerHTML=all.map(n=>'<tr>'+cols.map(c=>`<td>${c.f(n)}</td>`).join('')+'</tr>').join('');
+}
+
+// ── NETWORK PAGE ──
+function renderNetworkPage() {
+  const all = allNodes();
+  const online  = all.filter(isOnline);
+  const stale   = all.filter(isStale);
+  const offline = all.filter(isOffline);
+  document.getElementById('net-online').textContent  = online.length;
+  document.getElementById('net-stale').textContent   = stale.length;
+  document.getElementById('net-offline').textContent = offline.length;
+
+  function makeRows(nodes) {
+    if (!nodes.length) return `<tr><td colspan="6" class="empty">None</td></tr>`;
+    return nodes.map(n => `<tr>
+      <td><span class="sn-td">${n.sn||n.name||'—'}</span></td>
+      <td><span class="eui-td">${n.devEUI||'—'}</span></td>
+      <td>${n._appName||'—'}</td>
+      <td><div class="status-pill ${isOnline(n)?'sp-on':isStale(n)?'sp-stale':'sp-off'}" style="display:inline-flex">${isOnline(n)?'Online':isStale(n)?'Stale':'Offline'}</div></td>
+      <td><span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span></td>
+      <td><span class="${rssiCls(n.rssi)}">${n.rssi??'—'}</span></td>
+    </tr>`).join('');
+  }
+
+  document.getElementById('network-tbody').innerHTML = `
+    <tr style="background:rgba(0,230,118,.06)">
+      <td colspan="6" style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.07em">
+        🟢 Online — ${online.length} meter${online.length!==1?'s':''}
+      </td>
+    </tr>
+    ${makeRows(online)}
+    <tr style="background:rgba(255,179,0,.06)">
+      <td colspan="6" style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.07em">
+        🟡 Stale — ${stale.length} meter${stale.length!==1?'s':''}
+      </td>
+    </tr>
+    ${makeRows(stale)}
+    <tr style="background:rgba(255,71,87,.06)">
+      <td colspan="6" style="padding:8px 14px;font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em">
+        🔴 Offline — ${offline.length} meter${offline.length!==1?'s':''}
+      </td>
+    </tr>
+    ${makeRows(offline)}`;
+}
+
+// ── ALARMS PAGE ──
+function renderAlarmsPage() {
+  const alarms=allNodes().filter(n=>parseInt(n.errCount)>0);
+  document.getElementById('alarms-count').textContent=alarms.length+' alarm'+(alarms.length!==1?'s':'');
+  document.getElementById('alarms-tbody').innerHTML=alarms.length?alarms.map(n=>`<tr>
+    <td><span class="sn-td">${n.sn||n.name||'—'}</span></td>
+    <td><span class="eui-td">${n.devEUI||'—'}</span></td>
+    <td>${n._appName||'—'}</td>
+    <td style="color:var(--red);font-weight:700">${n.errCount}</td>
+    <td><span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span></td>
+    <td>${parseFloat(n.meterReading)?.toFixed(3)??'—'} m³</td>
+  </tr>`).join(''):`<tr><td colspan="6" class="empty">✅ No active alarms</td></tr>`;
+}
+
+// ── HISTORY PAGE ──
+let histPeriod = 'today';
+const periodLabels = {today:'Today',yesterday:'Yesterday',week:'This Week',lastweek:'Last Week',month:'This Month',all:'All Time'};
+
+function setHistPeriod(p, btn) {
+  histPeriod = p;
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderHistoryPage();
+}
+
+function getPHTNow() {
+  const now = new Date();
+  return new Date(now.getTime() + now.getTimezoneOffset()*60000 + 8*3600000);
+}
+
+function getPeriodRange(period) {
+  const pht = getPHTNow();
+  const y = pht.getFullYear(), m = pht.getMonth(), d = pht.getDate();
+  const dow = pht.getDay(); // 0=Sun
+  let start, end;
+  switch(period) {
+    case 'today':
+      start = new Date(y, m, d, 0, 0, 0);
+      end   = new Date(y, m, d, 23, 59, 59);
+      break;
+    case 'yesterday':
+      start = new Date(y, m, d-1, 0, 0, 0);
+      end   = new Date(y, m, d-1, 23, 59, 59);
+      break;
+    case 'week':
+      // Mon–Sun week
+      const monOffset = (dow===0?-6:1-dow);
+      start = new Date(y, m, d+monOffset, 0, 0, 0);
+      end   = new Date(y, m, d+monOffset+6, 23, 59, 59);
+      break;
+    case 'lastweek':
+      const lmonOff = (dow===0?-6:1-dow) - 7;
+      start = new Date(y, m, d+lmonOff, 0, 0, 0);
+      end   = new Date(y, m, d+lmonOff+6, 23, 59, 59);
+      break;
+    case 'month':
+      start = new Date(y, m, 1, 0, 0, 0);
+      end   = new Date(y, m+1, 0, 23, 59, 59);
+      break;
+    default: // all
+      start = new Date(2000, 0, 1);
+      end   = new Date(2099, 0, 1);
+  }
+  return { start, end };
+}
+
+function getConsumptionForPeriod(key, period) {
+  const hist = historyData[key] || [];
+  if(!hist.length) return null;
+  const { start, end } = getPeriodRange(period);
+  // Find readings within the period
+  const inPeriod = hist.filter(h => {
+    const t = new Date(h.ts);
+    return t >= start && t <= end;
+  });
+  if(inPeriod.length < 1) return null;
+  // Consumption = last reading in period - first reading in period (or reading just before period start)
+  const beforePeriod = hist.filter(h => new Date(h.ts) < start);
+  const baseline = beforePeriod.length ? beforePeriod[beforePeriod.length-1] : inPeriod[0];
+  const latest = inPeriod[inPeriod.length-1];
+  if(baseline.meterReading === null || latest.meterReading === null) return null;
+  const consumed = parseFloat(latest.meterReading) - parseFloat(baseline.meterReading);
+  return { consumed: consumed.toFixed(3), latest: parseFloat(latest.meterReading).toFixed(3), records: inPeriod.length, firstTs: baseline.ts, lastTs: latest.ts };
+}
+
+function renderHistoryPage() {
+  document.getElementById('hist-period-label').textContent = periodLabels[histPeriod];
+  const { start, end } = getPeriodRange(histPeriod);
+  const pad = n=>String(n).padStart(2,'0');
+  const fmtD = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  document.getElementById('hist-period-range').textContent =
+    histPeriod==='all' ? 'All recorded data' :
+    histPeriod==='today'||histPeriod==='yesterday' ? fmtD(start) :
+    `${fmtD(start)} → ${fmtD(end)}`;
+
+  const all = allNodes();
+
+  // ── Summary strip — one block per application ──
+  const grandTotal = Object.entries(appData).reduce((s,[,app])=>{
+    return s + app.nodes.reduce((ss,n)=>{
+      const c=getConsumptionForPeriod(n.sn||n.name||n.devEUI, histPeriod);
+      return ss+(c?parseFloat(c.consumed):0);
+    },0);
+  },0);
+
+  document.getElementById('consumption-summary').innerHTML =
+    // Grand total full-width row
+    `<div class="cons-row" style="border-bottom:1px solid var(--border);background:rgba(0,230,118,.04)">
+      <div class="cons-sn" style="color:var(--muted);font-size:10px">GRAND TOTAL — ALL APPLICATIONS</div>
+      <div class="cons-val"><span style="color:var(--green);font-family:var(--mono);font-size:22px">${grandTotal.toFixed(3)} m³</span></div>
+      <div class="cons-sub">${periodLabels[histPeriod]} · ${all.length} meters total</div>
+    </div>
+    <div class="cons-apps-row">` +
+    // One column per application
+    Object.entries(appData).map(([appId, app]) => {
+      const appTotal = app.nodes.reduce((s,n)=>{
+        const c=getConsumptionForPeriod(n.sn||n.name||n.devEUI,histPeriod);
+        return s+(c?parseFloat(c.consumed):0);
+      },0);
+      const meterRows = app.nodes.map(n => {
+        const key=n.sn||n.name||n.devEUI;
+        const cons=getConsumptionForPeriod(key,histPeriod);
+        return `<div class="cons-meter-row">
+          <div class="cons-sn">${n.sn||n.name||'—'}</div>
+          <div class="cons-val">${cons!==null
+            ?`<span style="color:${parseFloat(cons.consumed)>0?'var(--accent)':parseFloat(cons.consumed)<0?'var(--red)':'var(--muted)'};font-family:var(--mono)">${parseFloat(cons.consumed)>=0?'+':''}${cons.consumed} m³</span>`
+            :`<span style="color:var(--muted2);font-size:11px">No data</span>`}</div>
+          <div class="cons-sub">${cons?`Reading: ${cons.latest} m³`:''}</div>
+        </div>`;
+      }).join('');
+      return `<div class="cons-app-group">
+        <div class="cons-app-header">
+          <span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent)">${app.name}</span>
+          <span style="font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:700">${appTotal.toFixed(3)} m³</span>
+        </div>
+        ${meterRows}
+      </div>`;
+    }).join('') + `</div>`;
+
+  // ── Meter cards grouped by application ──
+  const grid = document.getElementById('history-meter-list');
+  let html = '';
+  Object.entries(appData).forEach(([appId, app]) => {
+    const nodes = app.nodes;
+    const appConsTotal = nodes.reduce((s,n)=>{
+      const key=n.sn||n.name||n.devEUI;
+      const c=getConsumptionForPeriod(key,histPeriod);
+      return s+(c?parseFloat(c.consumed):0);
+    },0);
+
+    html += `
+      <div class="app-section-hdr">
+        <div class="app-section-title">
+          <span class="chip chip-accent">${app.name}</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:8px">${nodes.length} meters</span>
+        </div>
+        <div style="font-family:var(--mono);font-size:13px;color:var(--accent)">
+          Total: <strong>${appConsTotal.toFixed(3)} m³</strong> consumed ${periodLabels[histPeriod].toLowerCase()}
+        </div>
+      </div>
+      <div class="meter-grid" style="margin-bottom:28px">
+        ${nodes.map(n => {
+          const key = n.sn||n.name||n.devEUI;
+          const hist = historyData[key]||[];
+          const cons = getConsumptionForPeriod(key, histPeriod);
+          const encKey = encodeURIComponent(key);
+          const consColor = cons&&parseFloat(cons.consumed)>0?'var(--accent)':cons&&parseFloat(cons.consumed)<0?'var(--red)':'var(--muted)';
+          return `<div class="meter-card" onclick="openModal('${encKey}','${key.replace(/'/g,'')}','${(n.devEUI||'').replace(/'/g,'')}')">
+            <div class="meter-head">
+              <div class="meter-sn"><span>SN: </span>${n.sn||n.name||'—'}</div>
+              <span class="section-badge">${hist.length} records</span>
+            </div>
+            <div class="meter-eui">${n.devEUI||'—'}</div>
+            <div class="meter-reading-block">
+              <div>
+                <div class="reading-val">${parseFloat(n.meterReading)?.toFixed(3)??'—'}<span class="reading-unit">m³</span></div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px">Current reading</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:var(--mono);font-size:20px;color:${consColor}">${cons?(parseFloat(cons.consumed)>=0?'+':'')+cons.consumed:'—'}</div>
+                <div style="font-size:11px;color:var(--muted)">${periodLabels[histPeriod]}</div>
+              </div>
+            </div>
+            <div class="meter-footer">
+              <button class="hist-btn">📈 View history & charts</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+// ── TRENDS PAGE ──
+let trendCharts=[];
+function renderTrends() {
+  trendCharts.forEach(c=>c.destroy());
+  trendCharts=[];
+  const period=document.getElementById('trend-period')?.value||'7';
+  const all=allNodes();
+  const grid=document.getElementById('trends-grid');
+  if(!grid)return;
+  grid.innerHTML=all.map((n,i)=>`<div class="trend-card"><div class="trend-title">${n.sn||n.name||n.devEUI}</div><div class="trend-sub">${n._appName||''} · ${n.devEUI||''}</div><div class="trend-chart-wrap"><canvas id="tc-${i}"></canvas></div></div>`).join('');
+  all.forEach((n,i)=>{
+    const key=n.sn||n.name||n.devEUI;
+    let hist=historyData[key]||[];
+    if(period!=='all'){
+      const cutoff=Date.now()-parseInt(period)*86400000;
+      hist=hist.filter(h=>new Date(h.ts).getTime()>cutoff);
+    }
+    const labels=hist.map(h=>fmt(h.ts));
+    const data=hist.map(h=>h.meterReading);
+    const ctx=document.getElementById(`tc-${i}`)?.getContext('2d');
+    if(!ctx)return;
+    const c=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'m³',data,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.08)',borderWidth:2,pointRadius:2,tension:.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>`${v.parsed.y?.toFixed(3)} m³`}}},scales:{x:{ticks:{color:'#6b7399',maxTicksLimit:6,font:{size:10}},grid:{color:'#252a38'}},y:{ticks:{color:'#6b7399',font:{size:10}},grid:{color:'#252a38'}}}}});
+    trendCharts.push(c);
+  });
+}
+
+// ── DOWNLOAD PAGE ──
+function renderDownloadList() {
+  const all=allNodes();
+  document.getElementById('download-list').innerHTML=all.map(n=>{
+    const key=n.sn||n.name||n.devEUI;
+    const hist=historyData[key]||[];
+    return `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px">
+      <div>
+        <div style="font-family:var(--mono);font-size:13px;font-weight:700">${key}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${n._appName||''} · ${hist.length} records</div>
+      </div>
+      <button class="dl-btn" onclick="downloadMeterCSV('${encodeURIComponent(key)}')">⬇ Download CSV</button>
+    </div>`;
+  }).join('');
+}
+
+function downloadMeterCSV(encKey) {
+  const key=decodeURIComponent(encKey);
+  const hist=historyData[key]||[];
+  if(!hist.length){alert('No history data for this meter yet.');return;}
+  const header='Timestamp,Meter Reading (m³),Consumption (m³),Battery,RSSI,SNR,Valve,Temperature\n';
+  const rows=hist.map((h,i)=>{
+    const prev=i>0?hist[i-1]:null;
+    let cons='';
+    if(prev&&h.meterReading!==null&&prev.meterReading!==null){
+      const diff=parseFloat(h.meterReading)-parseFloat(prev.meterReading);
+      cons=diff.toFixed(3); // e.g. 0.100 or -0.050
+    }
+    return [h.ts,h.meterReading??'',cons,h.battery??'',h.rssi??'',h.snr??'',h.valve??'',h.temperature??''].join(',');
+  }).join('\n');
+  const blob=new Blob([header+rows],{type:'text/csv'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`${key}_history.csv`;
+  a.click();
+}
+
+function downloadCSV() { if(modalMeterKey) downloadMeterCSV(modalMeterKey); }
+
+// ── MODAL ──
+function openModal(encKey, sn, eui) {
+  modalMeterKey=encKey;
+  const key=decodeURIComponent(encKey);
+  const hist=historyData[key]||[];
+  document.getElementById('modal-title').textContent='Meter: '+sn;
+  document.getElementById('modal-sub').textContent=(eui?'EUI: '+eui+' · ':'')+hist.length+' recorded readings';
+  document.getElementById('hist-count').textContent=hist.length+' records';
+  document.getElementById('modal-overlay').style.display='flex';
+  renderHistChart(hist);
+  renderHistTable(hist);
+}
+
+function closeModal(e) {
+  if(e&&e.target!==document.getElementById('modal-overlay')&&e.type==='click')return;
+  document.getElementById('modal-overlay').style.display='none';
+  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
+}
+
+function setChartType(t,btn) {
+  modalChartType=t;
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const key=decodeURIComponent(modalMeterKey||'');
+  const hist=historyData[key]||[];
+  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
+  renderHistChart(hist);
+}
+
+function renderHistChart(hist) {
+  const ctx=document.getElementById('hist-chart').getContext('2d');
+  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
+  if(!hist.length){return;}
+  const labels=hist.map(h=>fmt(h.ts));
+  const data=hist.map(h=>h.meterReading);
+  modalChartInst=new Chart(ctx,{
+    type:modalChartType==='bar'?'bar':'line',
+    data:{labels,datasets:[{
+      label:'Meter reading (m³)',data,
+      borderColor:'#00d4ff',
+      backgroundColor:modalChartType==='bar'?'rgba(0,212,255,.3)':'rgba(0,212,255,.08)',
+      borderWidth:2,pointRadius:3,tension:.3,fill:modalChartType!=='bar'
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>`${v.parsed.y?.toFixed(3)} m³`}}},
+      scales:{x:{ticks:{color:'#6b7399',maxTicksLimit:10,font:{size:10}},grid:{color:'#252a38'}},
+        y:{ticks:{color:'#6b7399',font:{size:10},callback:v=>v.toFixed(2)},grid:{color:'#252a38'}}}}
+  });
+}
+
+function renderHistTable(hist) {
+  const tbody=document.getElementById('hist-tbody');
+  if(!hist.length){tbody.innerHTML=`<tr><td colspan="6" class="no-history">📭 No history yet. Data is recorded every 60 seconds when the server is running.</td></tr>`;return;}
+  // Pre-compute consumption on original chronological order (current - previous)
+  const withCons = hist.map((h, i) => {
+    const prev = i > 0 ? hist[i-1] : null;
+    let cons = '—';
+    if (prev && h.meterReading !== null && prev.meterReading !== null) {
+      const diff = parseFloat(h.meterReading) - parseFloat(prev.meterReading);
+      cons = diff >= 0 ? '+' + diff.toFixed(3) : diff.toFixed(3);
+    }
+    return { ...h, cons };
+  });
+  // Show newest first
+  const rows = [...withCons].reverse();
+  tbody.innerHTML=rows.map((h)=>{
+    const cons = h.cons;
+    const consColor = cons==='—'?'var(--muted)': cons.startsWith('+')?'var(--green)':'var(--red)';
+    return `<tr>
+      <td class="tval">${fmt(h.ts)}</td>
+      <td style="font-family:var(--mono)">${h.meterReading!==null?parseFloat(h.meterReading).toFixed(3)+' m³':'—'}</td>
+      <td style="color:${consColor};font-family:var(--mono)">${cons!=='—'?cons+' m³':cons}</td>
+      <td>${h.battery??'—'}</td>
+      <td class="${rssiCls(h.rssi)}">${h.rssi??'—'}</td>
+      <td>${h.valve?`<span class="${h.valve.toLowerCase()==='open'?'vo':'vc'}">${h.valve}</span>`:'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── REFRESH ──
+async function manualRefresh(){
+  const btn=document.getElementById('rbtn');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
+  try{await fetch('http://localhost:3000/api/refresh');await fetchData();}catch(e){}
+  btn.disabled=false;btn.innerHTML='↻ Refresh';
+}
+function resetCountdown(){
+  cdSecs=60;clearInterval(cdTimer);
+  cdTimer=setInterval(()=>{
+    cdSecs--;
+    document.getElementById('cdwn').textContent=cdSecs+'s';
+    if(cdSecs<=0)fetchData();
+  },1000);
+}
+
+fetchData();
+</script>
+</body>
+</html>

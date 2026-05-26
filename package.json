@@ -1,0 +1,12 @@
+{
+  "name": "sindcon-dashboard",
+  "version": "1.0.0",
+  "description": "Real-time PrepaidWaterMeter dashboard for sIndCon IoT platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}

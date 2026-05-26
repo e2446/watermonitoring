@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redlink Water Billing System</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f14;--bg2:#13161e;--bg3:#1a1e28;--border:#252a38;--border2:#2e3447;
+  --text:#e8eaf0;--muted:#6b7399;--muted2:#4a5175;
+  --accent:#00d4ff;--green:#00e676;--red:#ff4757;--amber:#ffb300;--blue:#448aff;
+  --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;--display:'Bebas Neue',sans-serif;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100}
+.sidebar-logo{padding:18px;border-bottom:1px solid var(--border)}
+.logo-mark{display:flex;align-items:center;gap:10px;margin-bottom:3px}
+.logo-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--blue));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.logo-text{font-family:var(--mono);font-size:13px;font-weight:700}
+.logo-sub{font-size:10px;color:var(--muted);margin-left:40px}
+.nav{flex:1;padding:10px 0}
+.nav-section{padding:14px 16px 5px;font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.1em}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 16px;font-size:13px;color:var(--muted);cursor:pointer;border:none;background:none;width:100%;text-align:left;border-left:2px solid transparent;transition:all .15s;font-family:var(--sans);text-decoration:none}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--accent);background:rgba(0,212,255,.07);border-left-color:var(--accent)}
+.nav-item svg{width:15px;height:15px;flex-shrink:0}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{box-shadow:0 0 0 5px rgba(0,230,118,0)}}
+.pulse.live{animation:pulse 2s infinite}
+
+/* ── MAIN ── */
+.main{margin-left:220px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50}
+.page-title{font-size:15px;font-weight:600}
+.page-sub{font-size:11px;color:var(--muted)}
+.content{padding:24px;flex:1}
+
+/* ── CONTROLS ── */
+.controls-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
+.controls-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px}
+.controls-row{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+.ctrl-group{display:flex;flex-direction:column;gap:5px}
+.ctrl-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.ctrl-select,.ctrl-input{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:7px;font-size:13px;font-family:var(--sans);outline:none;min-width:140px}
+.ctrl-select:focus,.ctrl-input:focus{border-color:rgba(0,212,255,.4)}
+.ctrl-btn{padding:8px 18px;background:var(--accent);color:#000;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+.ctrl-btn:hover{background:#00bbdf}
+.ctrl-btn.secondary{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.3)}
+.ctrl-btn.secondary:hover{background:rgba(0,212,255,.2)}
+
+/* ── RATE SETTINGS ── */
+.rate-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.rate-item{display:flex;flex-direction:column;gap:4px}
+.rate-label{font-size:11px;color:var(--muted);font-weight:600}
+.rate-input{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;font-family:var(--mono);outline:none;width:100%}
+.rate-input:focus{border-color:rgba(0,212,255,.4)}
+
+/* ── BILLING TABLE ── */
+.billing-section{margin-bottom:20px}
+.billing-app-header{display:flex;align-items:center;justify-content:space-between;padding:10px 0 12px;border-bottom:2px solid var(--border2);margin-bottom:14px}
+.billing-app-name{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--accent)}
+.billing-app-total{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.tcard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px}
+.twrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--bg3);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+thead th.right{text-align:right}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:12px 14px;vertical-align:middle}
+tbody td.right{text-align:right;font-family:var(--mono)}
+.sn-td{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent)}
+.amount{font-family:var(--mono);font-weight:700}
+.amount.total{color:var(--green);font-size:14px}
+.badge-paid{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px}
+.badge-unpaid{background:rgba(255,71,87,.1);color:var(--red);border:1px solid rgba(255,71,87,.2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px}
+.print-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;background:rgba(68,138,255,.1);border:1px solid rgba(68,138,255,.25);color:var(--blue);border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+.print-btn:hover{background:rgba(68,138,255,.2)}
+.empty-state{text-align:center;padding:60px;color:var(--muted);font-size:14px}
+.ebar{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.25);color:#ff8a93;padding:10px 18px;border-radius:8px;margin-bottom:16px;font-size:13px;display:none}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.blue::before{background:linear-gradient(90deg,var(--blue),var(--accent))}
+.sc.green::before{background:var(--green)}
+.sc.amber::before{background:var(--amber)}
+.sc.red::before{background:var(--red)}
+.sc-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.sc-value{font-family:var(--mono);font-size:22px;font-weight:700}
+.sc.blue .sc-value{color:var(--accent)}.sc.green .sc-value{color:var(--green)}.sc.amber .sc-value{color:var(--amber)}.sc.red .sc-value{color:var(--red)}
+
+/* ── PRINT BILL MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal{background:white;border-radius:12px;width:min(720px,95vw);max-height:92vh;overflow:auto;color:#111}
+.modal-actions{background:var(--bg2);padding:12px 20px;display:flex;gap:10px;align-items:center;justify-content:flex-end;border-radius:0 0 12px 12px;position:sticky;bottom:0}
+
+/* ── BILL DESIGN (print area) ── */
+.bill{padding:40px;font-family:'DM Sans',sans-serif;background:white;color:#111;min-width:600px}
+.bill-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #0d7abf}
+.bill-logo{font-family:'Bebas Neue',sans-serif;font-size:36px;color:#0d7abf;letter-spacing:1px;line-height:1}
+.bill-logo-sub{font-size:11px;color:#666;margin-top:2px;font-weight:500}
+.bill-title{text-align:right}
+.bill-title h2{font-family:'Bebas Neue',sans-serif;font-size:28px;color:#111;letter-spacing:1px}
+.bill-title .bill-no{font-size:12px;color:#888;margin-top:2px;font-family:'Space Mono',monospace}
+.bill-meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+.bill-meta-box{background:#f8f9fa;border-radius:8px;padding:14px 16px}
+.bill-meta-box h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:8px}
+.bill-meta-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px}
+.bill-meta-row .label{color:#666}
+.bill-meta-row .value{font-weight:600;color:#111;font-family:'Space Mono',monospace;font-size:12px}
+.bill-table{width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px}
+.bill-table th{background:#0d7abf;color:white;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.bill-table th.r{text-align:right}
+.bill-table td{padding:10px 12px;border-bottom:1px solid #eee}
+.bill-table td.r{text-align:right;font-family:'Space Mono',monospace;font-size:12px}
+.bill-table tr:last-child td{border-bottom:none}
+.bill-table tr.subtotal td{background:#f8f9fa;font-weight:600}
+.bill-table tr.total-row td{background:#0d7abf;color:white;font-weight:700;font-size:14px}
+.bill-table tr.total-row td.r{font-family:'Space Mono',monospace}
+.bill-footer{display:flex;justify-content:space-between;align-items:flex-end;margin-top:24px;padding-top:16px;border-top:1px solid #eee}
+.bill-note{font-size:11px;color:#888;max-width:300px;line-height:1.5}
+.bill-sig{text-align:center}
+.bill-sig-line{width:160px;border-top:1px solid #aaa;margin:40px auto 4px}
+.bill-sig-label{font-size:11px;color:#888}
+.bill-stamp{display:inline-block;border:3px solid #0d7abf;border-radius:8px;padding:6px 16px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#0d7abf;letter-spacing:2px;opacity:.3}
+.block-tier{background:#fff3cd;border-left:3px solid #ffb300;padding:10px 14px;border-radius:4px;margin-bottom:14px;font-size:12px;color:#7a5c00}
+
+/* ── PRINT STYLES ── */
+@media print {
+  body{background:white!important}
+  .sidebar,.topbar,.modal-actions,.controls-card,.billing-section,.ebar,.stat-row{display:none!important}
+  .main{margin-left:0!important}
+  .modal-overlay{position:static!important;background:none!important;display:block!important}
+  .modal{box-shadow:none!important;border-radius:0!important;width:100%!important;max-height:none!important}
+  .bill{padding:20px!important}
+  @page{margin:15mm}
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon">💧</div>
+      <div class="logo-text">Redlink</div>
+    </div>
+    <div class="logo-sub">LoRaWAN Monitoring</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Main</div>
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </a>
+    <div class="nav-section">Billing</div>
+    <a class="nav-item active" href="billing.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Generate Bills
+    </a>
+    <div class="nav-section">Settings</div>
+    <a class="nav-item" href="#" onclick="toggleRates()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Water Rates
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="pulse live"></div>
+    <span id="conn-status">Loading…</span>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title">💧 Water Billing System</div>
+      <div class="page-sub">Redlink Organization · Monthly Bill Generation</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--muted)" id="clock"></span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="ebar" id="ebar">⚠️ Cannot reach server. Run <strong>node server.js</strong> then open <strong>http://localhost:3000/billing.html</strong></div>
+
+    <!-- CONTROLS -->
+    <div class="controls-card">
+      <div class="controls-title">📅 Billing Period & Settings</div>
+      <div class="controls-row">
+        <div class="ctrl-group">
+          <label class="ctrl-label">Month</label>
+          <select class="ctrl-select" id="sel-month">
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5" selected>May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label class="ctrl-label">Year</label>
+          <select class="ctrl-select" id="sel-year"></select>
+        </div>
+        <div class="ctrl-group">
+          <label class="ctrl-label">Application</label>
+          <select class="ctrl-select" id="sel-app">
+            <option value="all">All Applications</option>
+          </select>
+        </div>
+        <div class="ctrl-group">
+          <label class="ctrl-label">Due Date</label>
+          <input type="date" class="ctrl-input" id="due-date">
+        </div>
+        <button class="ctrl-btn" onclick="generateBills()">⚡ Generate Bills</button>
+        <button class="ctrl-btn secondary" onclick="printAllBills()">🖨 Print All</button>
+      </div>
+
+      <!-- RATE SETTINGS -->
+      <div class="rate-grid" id="rate-grid">
+        <div class="rate-item">
+          <label class="rate-label">💧 Minimum Charge (₱)</label>
+          <input type="number" class="rate-input" id="rate-min-charge" value="120" min="0" step="1">
+          <span style="font-size:10px;color:var(--muted)">For first 10 m³</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">📊 Min Included (m³)</label>
+          <input type="number" class="rate-input" id="rate-min-cubic" value="10" min="0" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">m³ included in minimum</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">💰 Rate per m³ (₱)</label>
+          <input type="number" class="rate-input" id="rate-per-cubic" value="15" min="0" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">Above minimum m³</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">🏛 Enviro. Fee (₱)</label>
+          <input type="number" class="rate-input" id="rate-env" value="5" min="0" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">Fixed per bill</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">📋 System Charge (₱)</label>
+          <input type="number" class="rate-input" id="rate-sys" value="10" min="0" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">Fixed per bill</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">🏦 VAT (%)</label>
+          <input type="number" class="rate-input" id="rate-vat" value="12" min="0" max="100" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">Applied to subtotal</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">🏢 Utility Name</label>
+          <input type="text" class="rate-input" id="rate-utility" value="Redlink Water Utility" style="font-family:var(--sans)">
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">📍 Address</label>
+          <input type="text" class="rate-input" id="rate-address" value="Ormoc City, Leyte" style="font-family:var(--sans)">
+        </div>
+      </div>
+    </div>
+
+    <!-- SUMMARY STATS -->
+    <div class="stat-row" id="stats-row" style="display:none">
+      <div class="sc blue"><div class="sc-label">Total Meters Billed</div><div class="sc-value" id="s-meters">0</div></div>
+      <div class="sc amber"><div class="sc-label">Total Consumption</div><div class="sc-value" id="s-consumption">0</div><div style="font-size:11px;color:var(--muted);margin-top:3px">m³</div></div>
+      <div class="sc green"><div class="sc-label">Total Amount Due</div><div class="sc-value" id="s-total">₱0</div></div>
+      <div class="sc red"><div class="sc-label">Avg Bill / Meter</div><div class="sc-value" id="s-avg">₱0</div></div>
+    </div>
+
+    <!-- BILL LIST -->
+    <div id="bill-list"></div>
+  </div>
+</div>
+
+<!-- PRINT MODAL -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div id="bill-print-area"></div>
+    <div class="modal-actions">
+      <button class="ctrl-btn secondary" onclick="closeModal()">✕ Close</button>
+      <button class="ctrl-btn" onclick="window.print()">🖨 Print Bill</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CLOCK ──
+setInterval(()=>{
+  const now = new Date();
+  const utc = now.getTime() + now.getTimezoneOffset()*60000;
+  const pht = new Date(utc + 8*3600000);
+  document.getElementById('clock').textContent = pht.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' PHT';
+},1000);
+
+// ── INIT ──
+let historyData = {};
+let appData = {};
+let generatedBills = [];
+
+// Populate year selector
+const yearSel = document.getElementById('sel-year');
+for(let y = 2026; y >= 2024; y--) {
+  const o = document.createElement('option');
+  o.value = y; o.textContent = y;
+  if(y===2026) o.selected = true;
+  yearSel.appendChild(o);
+}
+
+// Set default due date (15 days from now)
+const due = new Date(); due.setDate(due.getDate()+15);
+document.getElementById('due-date').value = due.toISOString().split('T')[0];
+
+// ── LOAD DATA ──
+async function loadData() {
+  try {
+    const [nodesRes, histRes] = await Promise.all([
+      fetch('http://localhost:3000/api/nodes'),
+      fetch('http://localhost:3000/api/history')
+    ]);
+    appData = (await nodesRes.json()).applications || {};
+    historyData = await histRes.json();
+    document.getElementById('ebar').style.display = 'none';
+    document.getElementById('conn-status').textContent = 'Connected';
+
+    // Populate app selector
+    const appSel = document.getElementById('sel-app');
+    appSel.innerHTML = '<option value="all">All Applications</option>';
+    Object.entries(appData).forEach(([id,app])=>{
+      const o = document.createElement('option');
+      o.value = id; o.textContent = app.name;
+      appSel.appendChild(o);
+    });
+  } catch(e) {
+    document.getElementById('ebar').style.display = 'block';
+    document.getElementById('conn-status').textContent = 'Offline';
+  }
+}
+
+// ── BILLING CALCULATION ──
+function getRates() {
+  return {
+    minCharge:    parseFloat(document.getElementById('rate-min-charge').value) || 120,
+    minCubic:     parseFloat(document.getElementById('rate-min-cubic').value)  || 10,
+    perCubic:     parseFloat(document.getElementById('rate-per-cubic').value)  || 15,
+    envFee:       parseFloat(document.getElementById('rate-env').value)        || 5,
+    sysCharge:    parseFloat(document.getElementById('rate-sys').value)        || 10,
+    vatPct:       parseFloat(document.getElementById('rate-vat').value)        || 12,
+    utilityName:  document.getElementById('rate-utility').value  || 'Redlink Water Utility',
+    address:      document.getElementById('rate-address').value  || 'Ormoc City, Leyte',
+  };
+}
+
+function calcBill(consumed, rates) {
+  const c = Math.max(0, consumed);
+
+  // Zero consumption = zero bill (no water used, no charge)
+  if(c === 0) {
+    return { waterCharge: 0, envFee: 0, sysCharge: 0, subtotal: 0, vat: 0, total: 0, isZero: true };
+  }
+
+  // Water charge: minimum charge covers first minCubic m³
+  // If consumed <= minCubic: pay minimum charge
+  // If consumed > minCubic: pay minimum charge + excess × rate per m³
+  let waterCharge = rates.minCharge;
+  if(c > rates.minCubic) {
+    waterCharge += (c - rates.minCubic) * rates.perCubic;
+  }
+
+  const subtotal = waterCharge + rates.envFee + rates.sysCharge;
+  const vat      = subtotal * (rates.vatPct / 100);
+  const total    = subtotal + vat;
+  return { waterCharge, envFee: rates.envFee, sysCharge: rates.sysCharge, subtotal, vat, total, isZero: false };
+}
+
+function getMonthConsumption(meterKey, year, month) {
+  const hist = historyData[meterKey] || [];
+  if(!hist.length) return null;
+
+  const start = new Date(year, month-1, 1, 0, 0, 0);
+  const end   = new Date(year, month,   0, 23, 59, 59); // last day of month
+
+  // All readings in the month
+  const inMonth = hist.filter(h => {
+    const t = new Date(h.ts);
+    return t >= start && t <= end && h.meterReading !== null;
+  });
+
+  if(!inMonth.length) return null;
+
+  // Baseline: last reading before the month, or first reading in month
+  const before = hist.filter(h => new Date(h.ts) < start && h.meterReading !== null);
+  const baseline = before.length ? before[before.length-1] : inMonth[0];
+  const latest = inMonth[inMonth.length-1];
+
+  const consumed = Math.max(0, parseFloat(latest.meterReading) - parseFloat(baseline.meterReading));
+  return {
+    consumed: consumed,
+    startReading: parseFloat(baseline.meterReading),
+    endReading:   parseFloat(latest.meterReading),
+    startDate:    baseline.ts,
+    endDate:      latest.ts,
+    records:      inMonth.length,
+  };
+}
+
+function generateBills() {
+  const month   = parseInt(document.getElementById('sel-month').value);
+  const year    = parseInt(document.getElementById('sel-year').value);
+  const selApp  = document.getElementById('sel-app').value;
+  const dueDate = document.getElementById('due-date').value;
+  const rates   = getRates();
+  const monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // Collect all meters
+  let allMeters = [];
+  Object.entries(appData).forEach(([appId, app]) => {
+    if(selApp !== 'all' && appId != selApp) return;
+    app.nodes.forEach(n => {
+      const key = n.sn || n.name || n.devEUI;
+      const cons = getMonthConsumption(key, year, month);
+      const bill = cons ? calcBill(cons.consumed, rates) : null;
+      allMeters.push({ appId, appName: app.name, n, key, cons, bill, dueDate,
+        billNo: `RWU-${year}${String(month).padStart(2,'0')}-${key.slice(-6)}`,
+        period: `${monthNames[month]} ${year}`,
+      });
+    });
+  });
+
+  generatedBills = allMeters;
+
+  // Summary stats
+  const billed     = allMeters.filter(m=>m.bill && !m.bill.isZero);
+  const totalCons  = billed.reduce((s,m)=>s+m.cons.consumed,0);
+  const totalAmt   = billed.reduce((s,m)=>s+m.bill.total,0);
+  document.getElementById('stats-row').style.display = 'grid';
+  document.getElementById('s-meters').textContent      = billed.length;
+  document.getElementById('s-consumption').textContent = totalCons.toFixed(3);
+  document.getElementById('s-total').textContent       = '₱'+totalAmt.toFixed(2);
+  document.getElementById('s-avg').textContent         = billed.length ? '₱'+(totalAmt/billed.length).toFixed(2) : '₱0';
+
+  // Render bill list grouped by app
+  const listEl = document.getElementById('bill-list');
+  const byApp = {};
+  allMeters.forEach(m => {
+    if(!byApp[m.appId]) byApp[m.appId] = { name: m.appName, meters: [] };
+    byApp[m.appId].meters.push(m);
+  });
+
+  listEl.innerHTML = Object.entries(byApp).map(([appId, group]) => {
+    const appTotal = group.meters.filter(m=>m.bill && !m.bill.isZero).reduce((s,m)=>s+m.bill.total,0);
+    const appCons  = group.meters.filter(m=>m.cons).reduce((s,m)=>s+m.cons.consumed,0);
+    return `
+    <div class="billing-section">
+      <div class="billing-app-header">
+        <div class="billing-app-name">📡 ${group.name}</div>
+        <div class="billing-app-total" style="display:flex;gap:16px">
+          <span>Total consumption: <strong style="color:var(--accent)">${appCons.toFixed(3)} m³</strong></span>
+          <span>Total bills: <strong style="color:var(--green)">₱${appTotal.toFixed(2)}</strong></span>
+        </div>
+      </div>
+      <div class="tcard">
+        <div class="twrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Serial / Meter</th>
+                <th>Device EUI</th>
+                <th>Period</th>
+                <th class="right">Prev Reading</th>
+                <th class="right">Curr Reading</th>
+                <th class="right">Consumed (m³)</th>
+                <th class="right">Water Charge</th>
+                <th class="right">Fees</th>
+                <th class="right">VAT (${rates.vatPct}%)</th>
+                <th class="right">TOTAL DUE</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${group.meters.map((m,i) => {
+                if(!m.cons || !m.bill) return `
+                  <tr>
+                    <td><span class="sn-td">${m.key}</span></td>
+                    <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${m.n.devEUI||'—'}</td>
+                    <td>${m.period}</td>
+                    <td colspan="7" style="color:var(--muted);font-style:italic">No data for this period</td>
+                    <td>—</td>
+                  </tr>`;
+                const isZero = m.bill.isZero;
+                return `
+                  <tr onclick="openBill(${generatedBills.indexOf(m)})">
+                    <td><span class="sn-td">${m.key}</span></td>
+                    <td style="font-family:var(--mono);font-size:11px;color:var(--accent)">${m.n.devEUI||'—'}</td>
+                    <td style="font-size:12px;color:var(--muted)">${m.period}</td>
+                    <td class="right">${m.cons.startReading.toFixed(3)}</td>
+                    <td class="right">${m.cons.endReading.toFixed(3)}</td>
+                    <td class="right" style="color:${isZero?'var(--muted)':m.cons.consumed>0?'var(--amber)':'var(--muted)'};font-weight:700">${m.cons.consumed.toFixed(3)}</td>
+                    <td class="right">${isZero?'<span style="color:var(--muted)">—</span>':'₱'+m.bill.waterCharge.toFixed(2)}</td>
+                    <td class="right" style="color:var(--muted)">${isZero?'—':'₱'+(m.bill.envFee+m.bill.sysCharge).toFixed(2)}</td>
+                    <td class="right" style="color:var(--muted)">${isZero?'—':'₱'+m.bill.vat.toFixed(2)}</td>
+                    <td class="right">${isZero
+                      ? '<span style="color:var(--muted);font-size:12px">₱0.00 — No usage</span>'
+                      : '<span class="amount total">₱'+m.bill.total.toFixed(2)+'</span>'}</td>
+                    <td>${isZero
+                      ? '<span style="color:var(--muted);font-size:11px">No bill</span>'
+                      : '<button class="print-btn" onclick="event.stopPropagation();openBill('+generatedBills.indexOf(m)+')">🖨 Print</button>'}</td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── OPEN INDIVIDUAL BILL ──
+function openBill(idx) {
+  const m = generatedBills[idx];
+  if(!m || !m.bill) return;
+  const rates = getRates();
+  document.getElementById('bill-print-area').innerHTML = buildBillHTML(m, rates);
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function buildBillHTML(m, rates) {
+  const excess = Math.max(0, m.cons.consumed - rates.minCubic);
+  const dueFormatted = m.dueDate ? new Date(m.dueDate).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'}) : '—';
+  const startFmt = m.cons.startDate ? m.cons.startDate.replace('T',' ').replace('+08:00','').substring(0,16) : '—';
+  const endFmt   = m.cons.endDate   ? m.cons.endDate.replace('T',' ').replace('+08:00','').substring(0,16)   : '—';
+  const isMin    = m.cons.consumed <= rates.minCubic;
+  return `
+  <div class="bill">
+    <div class="bill-header">
+      <div>
+        <div class="bill-logo">💧 ${rates.utilityName}</div>
+        <div class="bill-logo-sub">${rates.address}</div>
+        <div class="bill-logo-sub" style="margin-top:4px;color:#0d7abf">Water Statement of Account</div>
+      </div>
+      <div class="bill-title">
+        <h2>WATER BILL</h2>
+        <div class="bill-no">Bill No: ${m.billNo}</div>
+        <div class="bill-no">Period: ${m.period}</div>
+      </div>
+    </div>
+
+    <div class="bill-meta">
+      <div class="bill-meta-box">
+        <h4>Account Information</h4>
+        <div class="bill-meta-row"><span class="label">Serial Number</span><span class="value">${m.key}</span></div>
+        <div class="bill-meta-row"><span class="label">Device EUI</span><span class="value" style="font-size:10px">${m.n.devEUI||'—'}</span></div>
+        <div class="bill-meta-row"><span class="label">Application</span><span class="value" style="font-family:'DM Sans'">${m.appName}</span></div>
+        <div class="bill-meta-row"><span class="label">Meter Type</span><span class="value" style="font-family:'DM Sans'">LoRaWAN Water Meter</span></div>
+      </div>
+      <div class="bill-meta-box">
+        <h4>Billing Details</h4>
+        <div class="bill-meta-row"><span class="label">Billing Period</span><span class="value" style="font-family:'DM Sans'">${m.period}</span></div>
+        <div class="bill-meta-row"><span class="label">Reading Date</span><span class="value" style="font-size:10px">${endFmt}</span></div>
+        <div class="bill-meta-row"><span class="label">Due Date</span><span class="value" style="color:#e53e3e;font-family:'DM Sans'">${dueFormatted}</span></div>
+        <div class="bill-meta-row"><span class="label">Data Points</span><span class="value">${m.cons.records} readings</span></div>
+      </div>
+    </div>
+
+    ${isMin?`<div class="block-tier">ℹ️ Consumption of ${m.cons.consumed.toFixed(3)} m³ is within the minimum block (${rates.minCubic} m³). Minimum charge of ₱${rates.minCharge.toFixed(2)} applies.</div>`:''}
+
+    <table class="bill-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Details</th>
+          <th class="r">Amount (₱)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Previous Reading</strong></td>
+          <td>${startFmt}</td>
+          <td class="r">${m.cons.startReading.toFixed(3)} m³</td>
+        </tr>
+        <tr>
+          <td><strong>Current Reading</strong></td>
+          <td>${endFmt}</td>
+          <td class="r">${m.cons.endReading.toFixed(3)} m³</td>
+        </tr>
+        <tr style="background:#f0f9ff">
+          <td><strong>Total Consumption</strong></td>
+          <td>${m.cons.consumed.toFixed(3)} m³</td>
+          <td class="r"><strong>${m.cons.consumed.toFixed(3)} m³</strong></td>
+        </tr>
+        <tr><td colspan="3" style="padding:6px"></td></tr>
+        <tr>
+          <td>Minimum Charge (first ${rates.minCubic} m³)</td>
+          <td>${Math.min(m.cons.consumed, rates.minCubic).toFixed(3)} m³ × minimum</td>
+          <td class="r">₱${rates.minCharge.toFixed(2)}</td>
+        </tr>
+        ${excess > 0 ? `<tr>
+          <td>Excess Consumption</td>
+          <td>${excess.toFixed(3)} m³ × ₱${rates.perCubic.toFixed(2)}/m³</td>
+          <td class="r">₱${(excess * rates.perCubic).toFixed(2)}</td>
+        </tr>` : ''}
+        <tr>
+          <td>Environmental Fee</td>
+          <td>Fixed charge</td>
+          <td class="r">₱${rates.envFee.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td>System/Service Charge</td>
+          <td>Fixed charge</td>
+          <td class="r">₱${rates.sysCharge.toFixed(2)}</td>
+        </tr>
+        <tr class="subtotal">
+          <td colspan="2"><strong>Subtotal</strong></td>
+          <td class="r"><strong>₱${m.bill.subtotal.toFixed(2)}</strong></td>
+        </tr>
+        <tr>
+          <td>VAT (${rates.vatPct}%)</td>
+          <td>${rates.vatPct}% of subtotal</td>
+          <td class="r">₱${m.bill.vat.toFixed(2)}</td>
+        </tr>
+        <tr class="total-row">
+          <td colspan="2"><strong>TOTAL AMOUNT DUE</strong></td>
+          <td class="r"><strong>₱${m.bill.total.toFixed(2)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="bill-footer">
+      <div class="bill-note">
+        Please pay on or before <strong>${dueFormatted}</strong>.<br>
+        Late payment may result in disconnection.<br>
+        For inquiries, contact your water utility office.<br>
+        <br>
+        This bill is system-generated via LoRaWAN smart metering.
+      </div>
+      <div class="bill-sig">
+        <div class="bill-stamp">UNPAID</div>
+        <div class="bill-sig-line"></div>
+        <div class="bill-sig-label">Authorized Signature</div>
+        <div class="bill-sig-label" style="margin-top:2px;font-weight:600">${rates.utilityName}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display='none';
+}
+
+function printAllBills() {
+  if(!generatedBills.length){alert('Generate bills first.');return;}
+  const rates = getRates();
+  const billed = generatedBills.filter(m=>m.bill);
+  if(!billed.length){alert('No bills with data to print.');return;}
+  document.getElementById('bill-print-area').innerHTML =
+    billed.map(m=>buildBillHTML(m,rates)).join('<div style="page-break-after:always"></div>');
+  document.getElementById('modal-overlay').style.display='flex';
+}
+
+function toggleRates() {
+  const rg = document.getElementById('rate-grid');
+  rg.style.display = rg.style.display==='none' ? 'grid' : 'none';
+}
+
+// ── START ──
+loadData();
+</script>
+</body>
+</html>
