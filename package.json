@@ -8,5 +8,8 @@
   },
   "engines": {
     "node": ">=14"
+  },
+  "dependencies": {
+    "nodemailer": "^8.0.8"
   }
 }

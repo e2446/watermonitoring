@@ -212,6 +212,28 @@ tbody td{padding:10px 12px;vertical-align:middle}
 .zero-alert{background:rgba(255,107,53,.08);border:1px solid rgba(255,107,53,.25);border-radius:8px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px}
 .zero-alert-icon{font-size:18px}
 .zero-alert-text{color:#ff8c5a}
+
+/* PROBLEM METERS ALARM */
+.problem-section{margin-top:28px}
+.problem-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.problem-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.problem-badge{font-size:11px;background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.3);border-radius:99px;padding:2px 10px}
+.problem-type-tag{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid;white-space:nowrap}
+.pt-zero{background:rgba(255,179,0,.12);color:var(--amber);border-color:rgba(255,179,0,.3)}
+.pt-stale{background:rgba(255,107,53,.12);color:#ff6b35;border-color:rgba(255,107,53,.3)}
+.pt-offline{background:rgba(255,71,87,.12);color:var(--red);border-color:rgba(255,71,87,.3)}
+.pt-fast{background:rgba(179,136,255,.12);color:var(--purple);border-color:rgba(179,136,255,.3)}
+.email-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);color:var(--accent);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
+.email-btn:hover{background:rgba(0,212,255,.18);border-color:rgba(0,212,255,.5)}
+.email-btn:disabled{opacity:.4;cursor:not-allowed}
+.email-btn.sent{background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.3);color:var(--green)}
+.email-btn.no-email{background:none;border-color:var(--border);color:var(--muted2);cursor:default}
+.send-all-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);color:var(--red);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.send-all-btn:hover{background:rgba(255,71,87,.18)}
+.problem-summary-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.psb-item{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:8px}
+.psb-count{font-family:var(--mono);font-size:18px;font-weight:700;line-height:1}
+.psb-label{color:var(--muted);font-size:11px}
 </style>
 </head>
 <body>
@@ -415,11 +437,69 @@ tbody td{padding:10px 12px;vertical-align:middle}
 
     <!-- ALARMS -->
     <div id="page-alarms" style="display:none">
-      <div class="section-hdr"><span class="section-title">Active Alarms</span><span class="section-badge" id="alarms-count">0 alarms</span></div>
-      <div class="tcard"><div class="twrap"><table>
+      <!-- Error alarms section -->
+      <div class="section-hdr">
+        <span class="section-title">⚠️ Device Error Alarms</span>
+        <span class="section-badge" id="alarms-count">0 alarms</span>
+      </div>
+      <div class="tcard" style="margin-bottom:24px"><div class="twrap"><table>
         <thead><tr><th>Serial</th><th>Device EUI</th><th>Application</th><th>Error count</th><th>Last seen</th><th>Meter reading</th></tr></thead>
         <tbody id="alarms-tbody"></tbody>
       </table></div></div>
+
+      <!-- No consumption alarms section -->
+      <div class="section-hdr">
+        <span class="section-title">🚱 No Consumption Alarms <span style="font-size:11px;color:var(--muted);font-weight:400">(0.000 m³ for 24h+)</span></span>
+        <span class="section-badge" id="nocons-count">0 alarms</span>
+      </div>
+      <div class="tcard"><div class="twrap"><table>
+        <thead><tr>
+          <th>Serial</th>
+          <th>Device EUI</th>
+          <th>Application</th>
+          <th>Customer Name</th>
+          <th>Customer Email</th>
+          <th>Current Reading</th>
+          <th>Last Seen</th>
+          <th>Email Alert</th>
+        </tr></thead>
+        <tbody id="nocons-tbody"></tbody>
+      </table></div></div>
+
+      <!-- ══ PROBLEM METERS SECTION ══ -->
+      <div class="problem-section">
+        <div class="problem-section-hdr">
+          <div class="problem-title">
+            🔴 Problem Meters
+            <span class="problem-badge" id="problem-count">0 meters</span>
+          </div>
+          <button class="send-all-btn" onclick="sendAllProblemAlerts()" id="send-all-btn">
+            ✉️ Send All Email Alerts
+          </button>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+          Meters flagged for: <strong style="color:var(--amber)">zero reading (0.000 m³)</strong>,
+          <strong style="color:#ff6b35">stale/outdated last data (&gt;30 days)</strong>,
+          <strong style="color:var(--red)">offline status</strong>, or
+          <strong style="color:var(--purple)">unusually fast consumption</strong>.
+        </p>
+        <div class="problem-summary-bar" id="problem-summary-bar"></div>
+        <div class="tcard"><div class="twrap"><table>
+          <thead><tr>
+            <th>Serial</th>
+            <th>Device EUI</th>
+            <th>Application</th>
+            <th>Problem Type</th>
+            <th>Status</th>
+            <th>Meter Reading</th>
+            <th>Last Data</th>
+            <th>Customer</th>
+            <th>Email</th>
+            <th>Notify</th>
+          </tr></thead>
+          <tbody id="problem-tbody"></tbody>
+        </table></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -459,7 +539,7 @@ tbody td{padding:10px 12px;vertical-align:middle}
 
 <script>
 // ── STATE ──
-let appData = {}, historyData = {};
+let appData = {}, historyData = {}, customersData = {};
 let activeApp = null, currentView = 'card', currentFilter = 'all';
 let cdSecs = 60, cdTimer;
 let modalMeterKey = null, modalChartType = 'line', modalChartInst = null;
@@ -496,13 +576,15 @@ function showPage(p, btn) {
 // ── FETCH ──
 async function fetchData() {
   try {
-    const [nodesRes, histRes] = await Promise.all([
+    const [nodesRes, histRes, custRes] = await Promise.all([
       fetch('http://localhost:3000/api/nodes'),
-      fetch('http://localhost:3000/api/history')
+      fetch('http://localhost:3000/api/history'),
+      fetch('http://localhost:3000/api/customers')
     ]);
     if(!nodesRes.ok) throw new Error();
     appData = (await nodesRes.json()).applications || {};
     historyData = await histRes.json();
+    try { customersData = await custRes.json(); } catch(e) { customersData = {}; }
     document.getElementById('ebar').style.display = 'none';
     document.getElementById('conn-status').textContent = 'Connected';
     document.getElementById('status-dot').className = 'pulse live';
@@ -589,7 +671,9 @@ function updateStats() {
 function updateBadges() {
   const all = allNodes();
   document.getElementById('offline-badge').textContent = all.filter(isOffline).length;
-  document.getElementById('alarm-badge').textContent   = all.filter(n=>parseInt(n.errCount)>0).length;
+  const errAlarms = all.filter(n=>parseInt(n.errCount)>0).length;
+  document.getElementById('alarm-badge').textContent = errAlarms;
+  // No-cons badge updated async in renderAlarmsPage
 }
 
 // ── TABS ──
@@ -725,21 +809,88 @@ function renderTable(nodes) {
 }
 
 // ── METERS PAGE ──
+function getCustomer(n) {
+  const sn  = (n.sn   || n.name  || '').trim();
+  const eui = (n.devEUI || '').trim();
+  if (sn  && customersData[sn])  return customersData[sn];
+  if (eui && customersData[eui]) return customersData[eui];
+  const keys = Object.keys(customersData);
+  const hit = keys.find(k =>
+    (sn  && (sn.includes(k)  || k.includes(sn)))  ||
+    (eui && (eui.includes(k) || k.includes(eui)))
+  );
+  return hit ? customersData[hit] : null;
+}
+
 function renderMetersPage() {
   const all = allNodes();
-  const cols=[
-    {l:'Serial',f:n=>`<span class="sn-td">${n.sn||n.name||'—'}</span>`},
-    {l:'Device EUI',f:n=>`<span class="eui-td">${n.devEUI||'—'}</span>`},
-    {l:'Application',f:n=>n._appName||'—'},
-    {l:'Status',f:n=>{const on=isOnline(n);return `<div class="status-pill ${on?'sp-on':'sp-off'}" style="display:inline-flex">${on?'Online':'Offline'}</div>`}},
-    {l:'Meter reading',f:n=>{const v=parseFloat(n.meterReading);return `<span${isZero(n)?' style="color:var(--amber);font-weight:700"':''}>${!isNaN(v)?v.toFixed(3)+' m³':'—'}</span>`}},
-    {l:'Battery (%)',f:n=>{const p=parseInt(n.batteryLevel||n.battery)||0;const c=battColor(p);return `<span style="color:${c}">${p}%</span>`}},
-    {l:'RSSI',f:n=>`<span class="${rssiCls(n.rssi)}">${n.rssi??'—'}</span>`},
-    {l:'Last data',f:n=>`<span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span>`},
-    {l:'SW ver.',f:n=>n.softVer||'—'},
+  const registered = all.filter(n => getCustomer(n)).length;
+  const unregistered = all.length - registered;
+
+  // Update header with sync button and stats
+  document.getElementById('meters-app-tabs').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:13px;color:var(--muted)">
+          <span style="color:var(--green);font-weight:700">${registered}</span> registered &nbsp;·&nbsp;
+          <span style="color:var(--amber);font-weight:700">${unregistered}</span> unregistered
+        </span>
+      </div>
+      <button onclick="syncCustomers()" style="padding:6px 14px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--accent);border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--sans)">
+        🔄 Sync from Google Sheets
+      </button>
+    </div>`;
+
+  const cols = [
+    {l:'Serial',      f:n=>`<span class="sn-td">${n.sn||n.name||'—'}</span>`},
+    {l:'Device EUI',  f:n=>`<span class="eui-td">${n.devEUI||'—'}</span>`},
+    {l:'Application', f:n=>n._appName||'—'},
+    {l:'Status',      f:n=>{const on=isOnline(n);return `<div class="status-pill ${on?'sp-on':'sp-off'}" style="display:inline-flex">${on?'Online':'Offline'}</div>`}},
+    // Customer columns
+    {l:'👤 Customer Name', f:n=>{
+      const c=getCustomer(n);
+      return c ? `<span style="color:var(--text);font-weight:500">${c.fullName}</span>`
+               : `<span style="color:var(--muted2);font-size:11px;background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.2);color:var(--amber);padding:2px 8px;border-radius:99px;font-size:10px">Unregistered</span>`;
+    }},
+    {l:'📍 Address',       f:n=>{ const c=getCustomer(n); return c?`<span style="font-size:12px">${c.address}</span>`:'—'; }},
+    {l:'📞 Contact',       f:n=>{ const c=getCustomer(n); return c?c.contactNumber:'—'; }},
+    {l:'✉️ Email',         f:n=>{ const c=getCustomer(n); return c?`<span style="font-size:12px">${c.emailAddress}</span>`:'—'; }},
+    {l:'Meter Reading',   f:n=>{const v=parseFloat(n.meterReading);return `<span${isZero(n)?' style="color:var(--amber);font-weight:700"':''}>${!isNaN(v)?v.toFixed(3)+' m³':'—'}</span>`}},
+    {l:'Battery',         f:n=>{const p=parseInt(n.batteryLevel||n.battery)||0;const c=battColor(p);return `<span style="color:${c}">${p}%</span>`}},
+    {l:'Last data',       f:n=>`<span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span>`},
   ];
+
   document.getElementById('meters-thead').innerHTML='<tr>'+cols.map(c=>`<th>${c.l}</th>`).join('')+'</tr>';
-  document.getElementById('meters-tbody').innerHTML=all.map(n=>'<tr>'+cols.map(c=>`<td>${c.f(n)}</td>`).join('')+'</tr>').join('');
+  document.getElementById('meters-tbody').innerHTML = all.map(n =>
+    `<tr>${cols.map(c=>`<td>${c.f(n)}</td>`).join('')}</tr>`
+  ).join('');
+}
+
+async function syncCustomers() {
+  const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT83_7MmnUaJeK0Im_Iymag9UgRphZEOXt7LEigjbsJK4xV8pWWQVvR-tg8HRF1RF0jvPoz6mzvchRh/pub?gid=1333564699&single=true&output=csv';
+  try {
+    // Step 1: browser fetches CSV (no IP restrictions here)
+    const csvRes = await fetch(CSV_URL);
+    if (!csvRes.ok) throw new Error('Could not fetch Google Sheet CSV. Status: ' + csvRes.status);
+    const csv = await csvRes.text();
+    if (!csv.trim()) throw new Error('CSV is empty');
+
+    // Step 2: send CSV text to local server to parse & save
+    const syncRes = await fetch('http://localhost:3000/api/customers/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv })
+    });
+    const data = await syncRes.json();
+
+    // Step 3: reload customers from server
+    const custRes = await fetch('http://localhost:3000/api/customers');
+    customersData = await custRes.json();
+    renderMetersPage();
+    alert(`✅ Synced ${data.count} customers from Google Sheets!`);
+  } catch(e) {
+    alert('❌ Sync failed: ' + e.message);
+  }
 }
 
 // ── NETWORK PAGE ──
@@ -786,17 +937,195 @@ function renderNetworkPage() {
 }
 
 // ── ALARMS PAGE ──
-function renderAlarmsPage() {
-  const alarms=allNodes().filter(n=>parseInt(n.errCount)>0);
-  document.getElementById('alarms-count').textContent=alarms.length+' alarm'+(alarms.length!==1?'s':'');
-  document.getElementById('alarms-tbody').innerHTML=alarms.length?alarms.map(n=>`<tr>
+async function renderAlarmsPage() {
+  // ── Error alarms (errCount > 0) ──
+  const alarms = allNodes().filter(n=>parseInt(n.errCount)>0);
+  document.getElementById('alarms-count').textContent = alarms.length+' alarm'+(alarms.length!==1?'s':'');
+  document.getElementById('alarms-tbody').innerHTML = alarms.length ? alarms.map(n=>`<tr>
     <td><span class="sn-td">${n.sn||n.name||'—'}</span></td>
     <td><span class="eui-td">${n.devEUI||'—'}</span></td>
     <td>${n._appName||'—'}</td>
     <td style="color:var(--red);font-weight:700">${n.errCount}</td>
     <td><span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span></td>
     <td>${parseFloat(n.meterReading)?.toFixed(3)??'—'} m³</td>
-  </tr>`).join(''):`<tr><td colspan="6" class="empty">✅ No active alarms</td></tr>`;
+  </tr>`).join('') : `<tr><td colspan="6" class="empty">✅ No device error alarms</td></tr>`;
+
+  // ── No-consumption alarms (fetched from server) ──
+  try {
+    const res = await fetch('http://localhost:3000/api/alarms/no-consumption');
+    const noConsAlarms = await res.json();
+    document.getElementById('nocons-count').textContent = noConsAlarms.length+' alarm'+(noConsAlarms.length!==1?'s':'');
+
+    // Update nav badge total
+    const total = alarms.length + noConsAlarms.length;
+    document.getElementById('alarm-badge').textContent = total;
+
+    document.getElementById('nocons-tbody').innerHTML = noConsAlarms.length ? noConsAlarms.map(a=>`<tr>
+      <td><span class="sn-td">${a.key}</span></td>
+      <td><span class="eui-td">${a.devEUI||'—'}</span></td>
+      <td>${a.appName||'—'}</td>
+      <td>${a.customerName
+        ? `<span style="color:var(--text);font-weight:500">${a.customerName}</span>`
+        : `<span style="color:var(--amber);font-size:11px;background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.2);padding:2px 8px;border-radius:99px">Unregistered</span>`}
+      </td>
+      <td style="font-size:12px">${a.customerEmail||'<span style="color:var(--muted)">No email on file</span>'}</td>
+      <td style="font-family:var(--mono);color:var(--amber);font-weight:700">${parseFloat(a.currentReading).toFixed(3)} m³</td>
+      <td><span class="tval">${fmt(a.lastSeen)}</span></td>
+      <td>${a.emailSent
+        ? `<span style="color:var(--green);font-size:11px">✅ Sent ${a.emailSent}<br><span style="color:var(--muted)">${a.sentTo}</span></span>`
+        : (a.customerEmail
+          ? `<span style="color:var(--amber);font-size:11px">⏳ Pending next refresh</span>`
+          : `<span style="color:var(--muted);font-size:11px">No email — not sent</span>`)
+      }</td>
+    </tr>`).join('') : `<tr><td colspan="8" class="empty">✅ All meters have normal consumption</td></tr>`;
+  } catch(e) {
+    document.getElementById('nocons-tbody').innerHTML = `<tr><td colspan="8" class="empty" style="color:var(--red)">Could not load no-consumption alarms</td></tr>`;
+  }
+
+  // ── Problem Meters ──
+  renderProblemMeters();
+}
+
+// ── PROBLEM METERS DETECTION ──
+// Thresholds
+const STALE_DAYS        = 30;   // last data older than this → stale
+const FAST_CONS_M3_DAY  = 5;    // m³/day considered unusually high
+
+function detectProblems(n) {
+  const problems = [];
+  const reading  = parseFloat(n.meterReading);
+  const lastT    = n.lastActive || n.lastUpdate;
+  const diffMs   = lastT ? Date.now() - new Date(lastT).getTime() : Infinity;
+  const diffDays = diffMs / 86400000;
+
+  if (!isNaN(reading) && reading === 0) problems.push('zero');
+  if (diffDays > STALE_DAYS)            problems.push('stale');
+  if (getStatus(n) === 'offline')       problems.push('offline');
+
+  // Fast consumption: compare first and last history entries
+  const key  = n.sn || n.name || n.devEUI;
+  const hist = historyData[key] || [];
+  if (hist.length >= 2) {
+    const oldest = hist[0], newest = hist[hist.length-1];
+    if (oldest.meterReading !== null && newest.meterReading !== null) {
+      const span = (new Date(newest.ts) - new Date(oldest.ts)) / 86400000 || 1;
+      const rate = (parseFloat(newest.meterReading) - parseFloat(oldest.meterReading)) / span;
+      if (rate > FAST_CONS_M3_DAY) problems.push('fast');
+    }
+  }
+
+  return problems;
+}
+
+// Store problem meter data indexed by row — safe alternative to passing raw strings in onclick
+let _problemMeterStore = [];
+
+function renderProblemMeters() {
+  const all = allNodes();
+  const problems = all.map(n => ({ n, types: detectProblems(n) })).filter(x => x.types.length > 0);
+  _problemMeterStore = problems;
+
+  document.getElementById('problem-count').textContent = problems.length + ' meter' + (problems.length !== 1 ? 's' : '');
+
+  const zeroCnt    = problems.filter(x=>x.types.includes('zero')).length;
+  const staleCnt   = problems.filter(x=>x.types.includes('stale')).length;
+  const offlineCnt = problems.filter(x=>x.types.includes('offline')).length;
+  const fastCnt    = problems.filter(x=>x.types.includes('fast')).length;
+  document.getElementById('problem-summary-bar').innerHTML = `
+    <div class="psb-item"><div class="psb-count" style="color:var(--amber)">${zeroCnt}</div><div class="psb-label">Zero Reading<br>0.000 m³</div></div>
+    <div class="psb-item"><div class="psb-count" style="color:#ff6b35">${staleCnt}</div><div class="psb-label">Stale Data<br>&gt;${STALE_DAYS} days</div></div>
+    <div class="psb-item"><div class="psb-count" style="color:var(--red)">${offlineCnt}</div><div class="psb-label">Offline<br>No signal</div></div>
+    <div class="psb-item"><div class="psb-count" style="color:var(--purple)">${fastCnt}</div><div class="psb-label">Fast Consumption<br>&gt;${FAST_CONS_M3_DAY} m³/day</div></div>
+  `;
+
+  const tbody = document.getElementById('problem-tbody');
+  if (!problems.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">✅ No problem meters detected</td></tr>`;
+    return;
+  }
+
+  const typeMap = {
+    zero:    ['pt-zero',    '⚠ Zero Reading'],
+    stale:   ['pt-stale',   '🕐 Stale Data'],
+    offline: ['pt-offline', '📡 Offline'],
+    fast:    ['pt-fast',    '🚀 Fast Usage'],
+  };
+
+  tbody.innerHTML = problems.map(({n, types}, idx) => {
+    const cust    = getCustomer(n);
+    const email   = cust?.emailAddress || '';
+    const sn      = n.sn || n.name || '—';
+    const reading = parseFloat(n.meterReading);
+    const on  = isOnline(n), st = isStale(n);
+    const statusCls = on ? 'sp-on' : st ? 'sp-stale' : 'sp-off';
+    const statusLbl = on ? 'Online' : st ? 'Stale' : 'Offline';
+    const typeTags  = types.map(t => `<span class="problem-type-tag ${typeMap[t][0]}">${typeMap[t][1]}</span>`).join(' ');
+    const emailBtn = email
+      ? `<button class="email-btn" id="pbtn-${idx}" onclick="sendProblemAlert(${idx})">✉️ Notify</button>`
+      : `<button class="email-btn no-email" disabled title="No email on file">No email</button>`;
+    return `<tr>
+      <td><span class="sn-td">${sn}</span></td>
+      <td><span class="eui-td">${n.devEUI||'—'}</span></td>
+      <td>${n._appName||'—'}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;padding-top:12px">${typeTags}</td>
+      <td><div class="status-pill ${statusCls}" style="display:inline-flex">${statusLbl}</div></td>
+      <td style="font-family:var(--mono);${types.includes('zero')?'color:var(--amber);font-weight:700':''}">${!isNaN(reading)?reading.toFixed(3)+' m³':'—'}</td>
+      <td><span class="tval">${fmt(n.lastActive||n.lastUpdate)}</span></td>
+      <td>${cust ? `<span style="font-size:12px;font-weight:500">${cust.fullName}</span>` : `<span style="color:var(--amber);font-size:10px;background:rgba(255,179,0,.1);border:1px solid rgba(255,179,0,.2);padding:2px 8px;border-radius:99px">Unregistered</span>`}</td>
+      <td style="font-size:12px;color:var(--muted)">${email||'—'}</td>
+      <td>${emailBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function sendProblemAlert(idx) {
+  const entry = _problemMeterStore[idx];
+  if (!entry) return;
+  const { n } = entry;
+  const cust         = getCustomer(n);
+  const email        = cust?.emailAddress || '';
+  if (!email) return;
+  const sn           = n.sn || n.name || '';
+  const devEUI       = n.devEUI || '';
+  const appName      = n._appName || '';
+  const customerName = cust?.fullName || '';
+
+  const btn = document.getElementById('pbtn-' + idx);
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Sending…'; }
+
+  try {
+    const res = await fetch('http://localhost:3000/api/alarms/send-problem-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sn, devEUI, appName, email, customerName })
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error('Server ' + res.status + ': ' + txt);
+    }
+    const data = await res.json();
+    if (btn) {
+      if (data.ok) {
+        btn.className = 'email-btn sent';
+        btn.innerHTML = '✅ Sent!';
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = '✉️ Notify';
+        alert('Email failed: ' + (data.error || 'Unknown error'));
+      }
+    }
+  } catch(e) {
+    console.error('[ProblemAlert] fetch error:', e);
+    if (btn) { btn.disabled = false; btn.innerHTML = '✉️ Notify'; }
+    alert('Error: ' + e.message);
+  }
+}
+
+async function sendAllProblemAlerts() {
+  const btns = [...document.querySelectorAll('#problem-tbody .email-btn:not(.no-email):not(.sent):not(:disabled)')];
+  if (!btns.length) { alert('No unsent email alerts available.'); return; }
+  if (!confirm('Send email alerts to ' + btns.length + ' meter(s) with problems?')) return;
+  for (const b of btns) { b.click(); await new Promise(r => setTimeout(r, 400)); }
 }
 
 // ── HISTORY PAGE ──

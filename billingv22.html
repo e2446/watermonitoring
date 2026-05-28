@@ -82,11 +82,6 @@ tbody td.right{text-align:right;font-family:var(--mono)}
 .badge-unpaid{background:rgba(255,71,87,.1);color:var(--red);border:1px solid rgba(255,71,87,.2);font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px}
 .print-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;background:rgba(68,138,255,.1);border:1px solid rgba(68,138,255,.25);color:var(--blue);border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
 .print-btn:hover{background:rgba(68,138,255,.2)}
-.email-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.25);color:var(--green);border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--sans);transition:all .15s;white-space:nowrap}
-.email-btn:hover{background:rgba(0,230,118,.18)}
-.email-btn:disabled{opacity:.45;cursor:not-allowed}
-.email-btn.sending{animation:pulse-green 1s infinite}
-@keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.5}}
 .empty-state{text-align:center;padding:60px;color:var(--muted);font-size:14px}
 .ebar{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.25);color:#ff8a93;padding:10px 18px;border-radius:8px;margin-bottom:16px;font-size:13px;display:none}
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
@@ -99,12 +94,6 @@ tbody td.right{text-align:right;font-family:var(--mono)}
 .sc-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
 .sc-value{font-family:var(--mono);font-size:22px;font-weight:700}
 .sc.blue .sc-value{color:var(--accent)}.sc.green .sc-value{color:var(--green)}.sc.amber .sc-value{color:var(--amber)}.sc.red .sc-value{color:var(--red)}
-
-/* ── EMAIL TOAST ── */
-.toast{position:fixed;bottom:28px;right:28px;z-index:9999;display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.4);transition:all .3s;transform:translateY(80px);opacity:0;pointer-events:none}
-.toast.show{transform:translateY(0);opacity:1}
-.toast.success{background:#0d2a1a;border:1px solid rgba(0,230,118,.3);color:var(--green)}
-.toast.error{background:#2a0d0d;border:1px solid rgba(255,71,87,.3);color:var(--red)}
 
 /* ── PRINT BILL MODAL ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
@@ -141,16 +130,6 @@ tbody td.right{text-align:right;font-family:var(--mono)}
 .bill-sig-label{font-size:11px;color:#888}
 .bill-stamp{display:inline-block;border:3px solid #0d7abf;border-radius:8px;padding:6px 16px;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#0d7abf;letter-spacing:2px;opacity:.3}
 .block-tier{background:#fff3cd;border-left:3px solid #ffb300;padding:10px 14px;border-radius:4px;margin-bottom:14px;font-size:12px;color:#7a5c00}
-
-/* ── CUSTOMER PANEL ── */
-.cust-panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px}
-.cust-form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:14px}
-.cust-field{display:flex;flex-direction:column;gap:4px}
-.cust-field label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
-.cust-field input{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 11px;border-radius:6px;font-size:13px;font-family:var(--sans);outline:none}
-.cust-field input:focus{border-color:rgba(0,212,255,.4)}
-.cust-table-wrap{margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
-.sync-status{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}
 
 /* ── PRINT STYLES ── */
 @media print {
@@ -211,7 +190,7 @@ tbody td.right{text-align:right;font-family:var(--mono)}
   </div>
 
   <div class="content">
-    <div class="ebar" id="ebar">⚠️ Cannot reach server. Run <strong>node server.js</strong> then open <strong>http://100.121.27.107:3000/billing.html</strong></div>
+    <div class="ebar" id="ebar">⚠️ Cannot reach server. Run <strong>node server.js</strong> then open <strong>http://localhost:3000/billing.html</strong></div>
 
     <!-- CONTROLS -->
     <div class="controls-card">
@@ -289,105 +268,6 @@ tbody td.right{text-align:right;font-family:var(--mono)}
       </div>
     </div>
 
-    <!-- AUTO-BILLING STATUS PANEL -->
-    <div class="controls-card" id="autobill-panel">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div>
-          <div class="controls-title" style="margin-bottom:2px">🤖 Auto-Billing Scheduler</div>
-          <div style="font-size:11px;color:var(--muted)">Automatically emails bills to all customers on the scheduled send date</div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="ctrl-btn secondary" onclick="loadAutoBillStatus()" style="font-size:11px;padding:6px 14px">🔄 Refresh</button>
-          <button class="ctrl-btn secondary" onclick="triggerAutoBillNow()" id="trigger-btn" style="font-size:11px;padding:6px 14px;color:var(--amber);border-color:rgba(255,179,0,.3)">⚡ Run Now (Test)</button>
-          <button class="ctrl-btn secondary" onclick="clearAutoBillLog()" style="font-size:11px;padding:6px 14px;color:var(--red);border-color:rgba(255,71,87,.3)">🗑 Clear Log</button>
-        </div>
-      </div>
-
-      <div id="autobill-status" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
-        <div class="sc blue"><div class="sc-label">Status</div><div class="sc-value" id="ab-status" style="font-size:16px">—</div></div>
-        <div class="sc amber"><div class="sc-label">Send Day (of month)</div><div class="sc-value" id="ab-sendday">—</div></div>
-        <div class="sc green"><div class="sc-label">Due Day (of month)</div><div class="sc-value" id="ab-dueday">—</div></div>
-        <div class="sc blue"><div class="sc-label">Daily Check Time</div><div class="sc-value" id="ab-time" style="font-size:16px">—</div></div>
-        <div class="sc green"><div class="sc-label">Sent This Month</div><div class="sc-value" id="ab-sent-count">0</div></div>
-      </div>
-
-      <!-- SENT LOG TABLE -->
-      <div id="autobill-log-wrap" style="display:none">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📋 Sent Log — This Month</div>
-        <div class="tcard"><div class="twrap">
-          <table id="autobill-log-table">
-            <thead><tr>
-              <th>Meter</th><th>Customer</th><th>Email</th><th>Bill No</th><th class="right">Amount</th><th>Sent At</th>
-            </tr></thead>
-            <tbody id="autobill-log-body"></tbody>
-          </table>
-        </div></div>
-      </div>
-    </div>
-
-    <!-- CUSTOMER MANAGEMENT PANEL -->
-    <div class="cust-panel" id="cust-panel">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <div>
-          <div class="controls-title" style="margin-bottom:2px">👤 Customer Registry</div>
-          <div style="font-size:11px;color:var(--muted)">Register customers to meters for billing. Sync from Google Sheets or add manually.</div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="ctrl-btn secondary" onclick="syncFromGoogleSheet()" id="sync-btn" style="font-size:11px;padding:6px 14px;color:var(--accent)">🔄 Sync from Google Sheets</button>
-          <button class="ctrl-btn secondary" onclick="toggleAddCustomer()" style="font-size:11px;padding:6px 14px">➕ Add Manually</button>
-          <button class="ctrl-btn secondary" onclick="loadData()" style="font-size:11px;padding:6px 14px">↻ Refresh</button>
-        </div>
-      </div>
-      <div class="sync-status" id="sync-status"></div>
-
-      <!-- ADD CUSTOMER FORM (hidden by default) -->
-      <div id="add-cust-form" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:16px;margin-top:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:10px">➕ Add / Update Customer</div>
-        <div class="cust-form-grid">
-          <div class="cust-field">
-            <label>Meter Tag Number *</label>
-            <input type="text" id="cf-tag" placeholder="e.g. 0822000771000104">
-          </div>
-          <div class="cust-field">
-            <label>Full Name *</label>
-            <input type="text" id="cf-name" placeholder="e.g. Juan Dela Cruz">
-          </div>
-          <div class="cust-field">
-            <label>Address</label>
-            <input type="text" id="cf-address" placeholder="e.g. Brgy. Bagong Buhay">
-          </div>
-          <div class="cust-field">
-            <label>Contact Number</label>
-            <input type="text" id="cf-contact" placeholder="e.g. 09171234567">
-          </div>
-          <div class="cust-field">
-            <label>Email Address</label>
-            <input type="email" id="cf-email" placeholder="e.g. juan@email.com">
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="ctrl-btn" onclick="addCustomerManual()" style="font-size:12px;padding:7px 18px">💾 Save Customer</button>
-          <button class="ctrl-btn secondary" onclick="toggleAddCustomer()" style="font-size:12px;padding:7px 14px">Cancel</button>
-        </div>
-      </div>
-
-      <!-- CUSTOMER TABLE -->
-      <div class="cust-table-wrap" id="cust-table-wrap" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">📋 Registered Customers (<span id="cust-count">0</span>)</div>
-          <input type="text" id="cust-search" placeholder="Search name, meter, email…" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px;outline:none;width:220px" oninput="renderCustomerTable()">
-        </div>
-        <div class="tcard"><div class="twrap">
-          <table id="cust-table">
-            <thead><tr>
-              <th>Meter Tag</th><th>Full Name</th><th>Address</th><th>Contact</th><th>Email</th><th>Registered</th><th>Action</th>
-            </tr></thead>
-            <tbody id="cust-tbody"></tbody>
-          </table>
-        </div></div>
-      </div>
-    </div>
-
     <!-- SUMMARY STATS -->
     <div class="stat-row" id="stats-row" style="display:none">
       <div class="sc blue"><div class="sc-label">Total Meters Billed</div><div class="sc-value" id="s-meters">0</div></div>
@@ -407,14 +287,10 @@ tbody td.right{text-align:right;font-family:var(--mono)}
     <div id="bill-print-area"></div>
     <div class="modal-actions">
       <button class="ctrl-btn secondary" onclick="closeModal()">✕ Close</button>
-      <button class="email-btn" id="modal-email-btn" style="padding:8px 18px;font-size:13px" onclick="sendBillEmailFromModal()">✉️ Send to Customer Email</button>
       <button class="ctrl-btn" onclick="window.print()">🖨 Print Bill</button>
     </div>
   </div>
 </div>
-
-<!-- TOAST -->
-<div id="toast" class="toast"></div>
 
 <script>
 // ── CLOCK ──
@@ -449,16 +325,15 @@ let customersData = {};
 async function loadData() {
   try {
     const [nodesRes, histRes, custRes] = await Promise.all([
-      fetch('/api/nodes'),
-      fetch('/api/history'),
-      fetch('/api/customers')
+      fetch('http://localhost:3000/api/nodes'),
+      fetch('http://localhost:3000/api/history'),
+      fetch('http://localhost:3000/api/customers')
     ]);
     appData = (await nodesRes.json()).applications || {};
     historyData = await histRes.json();
     try { customersData = await custRes.json(); } catch(e) { customersData = {}; }
     document.getElementById('ebar').style.display = 'none';
     document.getElementById('conn-status').textContent = 'Connected';
-    renderCustomerTable();
 
     // Populate app selector
     const appSel = document.getElementById('sel-app');
@@ -653,10 +528,7 @@ function generateBills() {
                       : '<span class="amount total">₱'+m.bill.total.toFixed(2)+'</span>'}</td>
                     <td>${isZero
                       ? '<span style="color:var(--muted);font-size:11px">No bill</span>'
-                      : `<div style="display:flex;flex-direction:column;gap:5px">
-                           <button class="print-btn" onclick="event.stopPropagation();openBill(${generatedBills.indexOf(m)})">🖨 Print</button>
-                         </div>`
-                    }</td>
+                      : '<button class="print-btn" onclick="event.stopPropagation();openBill('+generatedBills.indexOf(m)+')">🖨 Print</button>'}</td>
                   </tr>`;
               }).join('')}
             </tbody>
@@ -865,326 +737,8 @@ function lookupCustomer(meterKey, devEUI) {
   return null;
 }
 
-// ── TOAST NOTIFICATION ──
-function showToast(msg, type = 'success', duration = 4000) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `toast ${type} show`;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => { el.className = `toast ${type}`; }, duration);
-}
-
-// ── TRACK CURRENT OPEN BILL INDEX ──
-let currentBillIdx = null;
-
-// Override openBill to track current index
-const _origOpenBill = openBill;
-function openBill(idx) {
-  currentBillIdx = idx;
-  const m = generatedBills[idx];
-  if(!m || !m.bill) return;
-  const rates = getRates();
-  document.getElementById('bill-print-area').innerHTML = buildBillHTML(m, rates);
-  document.getElementById('modal-overlay').style.display = 'flex';
-
-  // Update modal email button state
-  const emailBtn = document.getElementById('modal-email-btn');
-  if (emailBtn) {
-    const hasCust = m.customer && m.customer.emailAddress;
-    emailBtn.disabled = !hasCust;
-    emailBtn.title = hasCust ? `Send to ${m.customer.emailAddress}` : 'No email address registered for this meter';
-    emailBtn.textContent = hasCust ? `✉️ Send to ${m.customer.emailAddress}` : '✉️ No Email on File';
-  }
-}
-
-// ── SEND BILL EMAIL (from table row button) ──
-async function sendBillEmail(idx, btnEl) {
-  const m = generatedBills[idx];
-  if (!m || !m.bill || !m.customer) return;
-  await _doSendEmail(m, btnEl);
-}
-
-// ── SEND BILL EMAIL (from modal) ──
-async function sendBillEmailFromModal() {
-  if (currentBillIdx === null) return;
-  const m = generatedBills[currentBillIdx];
-  if (!m || !m.bill || !m.customer) return;
-  const btn = document.getElementById('modal-email-btn');
-  await _doSendEmail(m, btn);
-}
-
-// ── CORE EMAIL SEND ──
-async function _doSendEmail(m, btnEl) {
-  if (!m.customer || !m.customer.emailAddress) {
-    showToast('⚠️ No email address for this customer.', 'error'); return;
-  }
-  if (btnEl) { btnEl.disabled = true; btnEl.classList.add('sending'); btnEl.textContent = '⏳ Sending…'; }
-
-  const rates = getRates();
-  const payload = {
-    customer: m.customer,
-    bill: m.bill,
-    meter: {
-      key:          m.key,
-      devEUI:       m.n && m.n.devEUI,
-      consumed:     m.cons.consumed,
-      startReading: m.cons.startReading,
-      endReading:   m.cons.endReading,
-    },
-    rates,
-    period:  m.period,
-    billNo:  m.billNo,
-    dueDate: m.dueDate,
-  };
-
-  try {
-    const res = await fetch('/api/send-bill', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (data.ok) {
-      showToast(`✅ Bill emailed to ${data.to}`, 'success');
-      if (btnEl) { btnEl.textContent = '✅ Sent!'; setTimeout(()=>{ btnEl.disabled=false; btnEl.classList.remove('sending'); btnEl.textContent = `✉️ ${m.customer.emailAddress}`; }, 3000); }
-    } else {
-      showToast(`❌ Email failed: ${data.error}`, 'error', 6000);
-      if (btnEl) { btnEl.disabled=false; btnEl.classList.remove('sending'); btnEl.textContent='✉️ Retry'; }
-    }
-  } catch(e) {
-    showToast('❌ Could not reach server. Is node server.js running?', 'error', 6000);
-    if (btnEl) { btnEl.disabled=false; btnEl.classList.remove('sending'); btnEl.textContent='✉️ Retry'; }
-  }
-}
-
-// ── CUSTOMER MANAGEMENT ──
-
-// Google Sheets CSV URL (must be published as CSV export)
-const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1JGwdwxvQoF9P8DdC0SZ3D9IH8npnd60ExbTXIpqQeIw/export?format=csv&gid=1333564699';
-
-function toggleAddCustomer() {
-  const f = document.getElementById('add-cust-form');
-  f.style.display = f.style.display === 'none' ? 'block' : 'none';
-  if (f.style.display === 'block') {
-    document.getElementById('cf-tag').focus();
-  }
-}
-
-async function syncFromGoogleSheet() {
-  const btn = document.getElementById('sync-btn');
-  const status = document.getElementById('sync-status');
-  btn.disabled = true;
-  btn.textContent = '⏳ Fetching from Google Sheets…';
-  status.style.color = 'var(--muted)';
-  status.textContent = 'Connecting to Google Sheets…';
-
-  try {
-    // Fetch CSV directly from browser (avoids Pi network restrictions)
-    const res = await fetch(SHEET_CSV_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const csvText = await res.text();
-    if (!csvText || csvText.trim().length < 10) throw new Error('Empty CSV returned');
-
-    // Send CSV to server to parse and save
-    const syncRes = await fetch('/api/customers/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csv: csvText }),
-    });
-    const data = await syncRes.json();
-    if (data.ok) {
-      status.style.color = 'var(--green)';
-      status.textContent = `✅ Synced ${data.count} customer(s) from Google Sheets at ${new Date().toLocaleTimeString()}`;
-      // Refresh local customer data
-      const custRes = await fetch('/api/customers');
-      customersData = await custRes.json();
-      renderCustomerTable();
-      showToast(`✅ Synced ${data.count} customers from Google Sheets`, 'success');
-    } else {
-      throw new Error(data.error || 'Server error');
-    }
-  } catch(e) {
-    status.style.color = 'var(--red)';
-    status.textContent = `❌ Sync failed: ${e.message}`;
-    showToast(`❌ Sync failed: ${e.message}`, 'error', 6000);
-  }
-  btn.disabled = false;
-  btn.textContent = '🔄 Sync from Google Sheets';
-}
-
-async function addCustomerManual() {
-  const tag     = document.getElementById('cf-tag').value.trim();
-  const name    = document.getElementById('cf-name').value.trim();
-  const address = document.getElementById('cf-address').value.trim();
-  const contact = document.getElementById('cf-contact').value.trim();
-  const email   = document.getElementById('cf-email').value.trim();
-
-  if (!tag || !name) {
-    showToast('⚠️ Meter Tag Number and Full Name are required.', 'error'); return;
-  }
-
-  try {
-    // Build a minimal CSV and send to /api/customers/sync
-    const header = 'Meter Tag Number,Full Name,Address,Contact Number,Email Address,Timestamp';
-    const row    = `${tag},"${name}","${address}","${contact}","${email}","${new Date().toLocaleString()}"`;
-    const csv    = header + '\n' + row;
-
-    const res = await fetch('/api/customers/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csv, merge: true }),
-    });
-
-    // merge: true is handled gracefully even if server doesn't support it —
-    // we'll also manually merge on the client side
-    const data = await res.json();
-
-    // Always merge locally so UI updates immediately
-    customersData[tag] = { fullName: name, address, contactNumber: contact, emailAddress: email,
-      timestamp: new Date().toLocaleString(), meterTagNumber: tag };
-
-    // Refresh from server to get the persisted state
-    const custRes = await fetch('/api/customers');
-    try { customersData = await custRes.json(); } catch(e) {}
-
-    renderCustomerTable();
-    showToast(`✅ Customer "${name}" saved for meter ${tag}`, 'success');
-
-    // Clear form
-    ['cf-tag','cf-name','cf-address','cf-contact','cf-email'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
-    document.getElementById('add-cust-form').style.display = 'none';
-
-  } catch(e) {
-    showToast(`❌ Failed to save: ${e.message}`, 'error', 6000);
-  }
-}
-
-async function deleteCustomer(tag) {
-  if (!confirm(`Remove customer for meter ${tag}?`)) return;
-  delete customersData[tag];
-  // Rebuild and re-sync the entire customers object to server
-  // We do this by building CSV from current customersData
-  const rows = Object.values(customersData);
-  let csv = 'Meter Tag Number,Full Name,Address,Contact Number,Email Address,Timestamp\n';
-  csv += rows.map(c => `${c.meterTagNumber},"${c.fullName}","${c.address||''}","${c.contactNumber||''}","${c.emailAddress||''}","${c.timestamp||''}"`).join('\n');
-  try {
-    await fetch('/api/customers/sync', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ csv }),
-    });
-    const custRes = await fetch('/api/customers');
-    try { customersData = await custRes.json(); } catch(e) {}
-    renderCustomerTable();
-    showToast('🗑 Customer removed.', 'success');
-  } catch(e) {
-    showToast(`❌ ${e.message}`, 'error');
-  }
-}
-
-function renderCustomerTable() {
-  const wrap  = document.getElementById('cust-table-wrap');
-  const tbody = document.getElementById('cust-tbody');
-  const count = document.getElementById('cust-count');
-  const search = (document.getElementById('cust-search').value || '').toLowerCase();
-  const all   = Object.values(customersData);
-
-  const filtered = search ? all.filter(c =>
-    (c.fullName||'').toLowerCase().includes(search) ||
-    (c.meterTagNumber||'').toLowerCase().includes(search) ||
-    (c.emailAddress||'').toLowerCase().includes(search) ||
-    (c.address||'').toLowerCase().includes(search)
-  ) : all;
-
-  count.textContent = all.length;
-  wrap.style.display = all.length ? 'block' : 'none';
-
-  tbody.innerHTML = filtered.length ? filtered.map(c => `
-    <tr>
-      <td><span class="sn-td">${c.meterTagNumber||'—'}</span></td>
-      <td style="font-weight:600">${c.fullName||'—'}</td>
-      <td style="font-size:12px;color:var(--muted)">${c.address||'—'}</td>
-      <td style="font-family:var(--mono);font-size:12px">${c.contactNumber||'—'}</td>
-      <td style="font-size:12px;color:var(--accent)">${c.emailAddress||'<span style="color:var(--muted2);font-style:italic">No email</span>'}</td>
-      <td style="font-size:11px;color:var(--muted)">${c.timestamp||'—'}</td>
-      <td>
-        <button class="print-btn" style="color:var(--red);border-color:rgba(255,71,87,.3)"
-          onclick="deleteCustomer('${c.meterTagNumber}')">🗑 Remove</button>
-      </td>
-    </tr>`).join('') :
-    `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No customers match your search.</td></tr>`;
-}
-
-// ── AUTO-BILLING PANEL ──
-async function loadAutoBillStatus() {
-  try {
-    const res  = await fetch('/api/autobilling/status');
-    const data = await res.json();
-
-    document.getElementById('ab-status').textContent   = data.enabled ? '✅ ON' : '⛔ OFF';
-    document.getElementById('ab-sendday').textContent  = data.sendDay + (data.sendDay===1?'st':data.sendDay===2?'nd':data.sendDay===3?'rd':'th');
-    document.getElementById('ab-dueday').textContent   = data.dueDayOfMonth + (data.dueDayOfMonth===1?'st':data.dueDayOfMonth===2?'nd':data.dueDayOfMonth===3?'rd':'th');
-    document.getElementById('ab-time').textContent     = `${String(data.runHour).padStart(2,'0')}:${String(data.runMinute).padStart(2,'0')} PHT`;
-
-    // Show this month's log
-    const now       = new Date();
-    const monthKey  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    const thisLog   = data.log[monthKey] || {};
-    const entries   = Object.entries(thisLog);
-
-    document.getElementById('ab-sent-count').textContent = entries.length;
-
-    const tbody = document.getElementById('autobill-log-body');
-    if (entries.length) {
-      document.getElementById('autobill-log-wrap').style.display = 'block';
-      tbody.innerHTML = entries.map(([meter, info]) => `
-        <tr>
-          <td><span class="sn-td">${meter}</span></td>
-          <td style="font-size:12px">${info.email ? info.email.split('@')[0] : '—'}</td>
-          <td style="font-size:11px;color:var(--muted)">${info.email || '—'}</td>
-          <td style="font-family:var(--mono);font-size:11px;color:var(--accent)">${info.billNo || '—'}</td>
-          <td class="right"><span class="amount" style="color:var(--green)">₱${info.total ? parseFloat(info.total).toFixed(2) : '—'}</span></td>
-          <td style="font-size:11px;color:var(--muted)">${info.sentAt ? info.sentAt.replace('T',' ').replace('+08:00',' PHT').substring(0,22) : '—'}</td>
-        </tr>`).join('');
-    } else {
-      document.getElementById('autobill-log-wrap').style.display = 'none';
-      tbody.innerHTML = '';
-    }
-  } catch(e) {
-    document.getElementById('ab-status').textContent = '⚠️ Offline';
-  }
-}
-
-async function triggerAutoBillNow() {
-  const btn = document.getElementById('trigger-btn');
-  btn.disabled = true; btn.textContent = '⏳ Running…';
-  try {
-    const res  = await fetch('/api/autobilling/run', { method: 'POST' });
-    const data = await res.json();
-    showToast(data.ok ? '✅ Auto-billing run complete! Check server console for details.' : `❌ ${data.error}`, data.ok ? 'success' : 'error', 6000);
-    await loadAutoBillStatus();
-  } catch(e) {
-    showToast('❌ Could not reach server.', 'error');
-  }
-  btn.disabled = false; btn.textContent = '⚡ Run Now (Test)';
-}
-
-async function clearAutoBillLog() {
-  if (!confirm('Clear the auto-billing sent log? This allows bills to be re-sent for the current month.')) return;
-  try {
-    const res  = await fetch('/api/autobilling/log', { method: 'DELETE' });
-    const data = await res.json();
-    showToast(data.ok ? '🗑 Log cleared.' : `❌ ${data.error}`, data.ok ? 'success' : 'error');
-    await loadAutoBillStatus();
-  } catch(e) {
-    showToast('❌ Could not reach server.', 'error');
-  }
-}
-
 // ── START ──
 loadData();
-loadAutoBillStatus();
 </script>
 </body>
 </html>
