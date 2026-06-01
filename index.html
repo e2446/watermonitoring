@@ -244,7 +244,7 @@ tbody td{padding:10px 12px;vertical-align:middle}
       <div class="logo-icon">💧</div>
       <div class="logo-text">Redlink</div>
     </div>
-    <div class="logo-sub">LoRaWAN Monitoring</div>
+    <div class="logo-sub" id="sidebar-org">LoRaWAN Monitoring</div>
   </div>
   <nav class="nav">
     <div class="nav-section">Main</div>
@@ -301,12 +301,18 @@ tbody td{padding:10px 12px;vertical-align:middle}
   <div class="topbar">
     <div>
       <div class="page-title" id="page-title">Dashboard</div>
-      <div class="page-sub">Redlink Organization · LoRaWAN Monitoring</div>
+      <div class="page-sub" id="page-sub">Redlink · LoRaWAN Monitoring</div>
     </div>
     <div class="topbar-right">
       <span class="clock" id="clock"></span>
       <span class="cdwn" id="cdwn"></span>
+      <div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:5px 12px">
+        <span style="font-size:11px;color:var(--muted)" id="topbar-org">—</span>
+        <span style="color:var(--border2)">|</span>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--accent)" id="topbar-user">—</span>
+      </div>
       <button class="rbtn" id="rbtn" onclick="manualRefresh()">↻ Refresh</button>
+      <button class="rbtn" onclick="doLogout()" style="background:rgba(255,71,87,.1);border-color:rgba(255,71,87,.25);color:var(--red)">⏻ Logout</button>
     </div>
   </div>
 
@@ -323,7 +329,7 @@ tbody td{padding:10px 12px;vertical-align:middle}
         <div class="sc orange"><div class="sc-label">Zero readings</div><div class="sc-value" id="m-zero">—</div></div>
         <div class="sc purple"><div class="sc-label">Application</div><div class="sc-app" id="m-appname">—</div></div>
       </div>
-      <div class="app-tabs" id="app-tabs"></div>
+      <div class="app-tabs" id="app-tabs" style="display:none"></div>
       <div id="zero-alert" style="display:none" class="zero-alert">
         <span class="zero-alert-icon">⚠️</span>
         <span class="zero-alert-text" id="zero-alert-text"></span>
@@ -538,11 +544,34 @@ tbody td{padding:10px 12px;vertical-align:middle}
 </div>
 
 <script>
+// ── MANAGEMENT SESSION ──
+const mgmtUser = JSON.parse(sessionStorage.getItem('mgmt_user') || 'null');
+const mgmtToken = sessionStorage.getItem('mgmt_token') || '';
+if (!mgmtToken || !mgmtUser) {
+  // Not logged in — redirect to login page
+  window.location.href = '/customer-portal.html';
+}
+
+function doLogout() {
+  sessionStorage.removeItem('mgmt_token');
+  sessionStorage.removeItem('mgmt_user');
+  window.location.href = '/customer-portal.html';
+}
+
 // ── STATE ──
 let appData = {}, historyData = {}, customersData = {};
 let activeApp = null, currentView = 'card', currentFilter = 'all';
 let cdSecs = 60, cdTimer;
 let modalMeterKey = null, modalChartType = 'line', modalChartInst = null;
+
+// ── ON LOAD: populate topbar from session ──
+(function initSession() {
+  if (!mgmtUser) return;
+  document.getElementById('topbar-user').textContent  = mgmtUser.username;
+  document.getElementById('topbar-org').textContent   = mgmtUser.org || mgmtUser.appName;
+  document.getElementById('page-sub').textContent     = (mgmtUser.org || 'Redlink') + ' · ' + mgmtUser.appName;
+  document.getElementById('sidebar-org').textContent  = mgmtUser.org || 'LoRaWAN Monitoring';
+})();
 
 // ── CLOCK ──
 // ── PHT CLOCK (UTC+8) ──
@@ -577,10 +606,14 @@ function showPage(p, btn) {
 async function fetchData() {
   try {
     const [nodesRes, histRes, custRes] = await Promise.all([
-      fetch('http://localhost:3000/api/nodes'),
-      fetch('http://localhost:3000/api/history'),
-      fetch('http://localhost:3000/api/customers')
+      fetch('/api/mgmt/nodes', { headers: { 'x-mgmt-token': mgmtToken } }),
+      fetch('/api/history'),
+      fetch('/api/customers')
     ]);
+    if (nodesRes.status === 401) {
+      doLogout();
+      return;
+    }
     if(!nodesRes.ok) throw new Error();
     appData = (await nodesRes.json()).applications || {};
     historyData = await histRes.json();
@@ -876,7 +909,7 @@ async function syncCustomers() {
     if (!csv.trim()) throw new Error('CSV is empty');
 
     // Step 2: send CSV text to local server to parse & save
-    const syncRes = await fetch('http://localhost:3000/api/customers/sync', {
+    const syncRes = await fetch('/api/customers/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ csv })
@@ -884,7 +917,7 @@ async function syncCustomers() {
     const data = await syncRes.json();
 
     // Step 3: reload customers from server
-    const custRes = await fetch('http://localhost:3000/api/customers');
+    const custRes = await fetch('/api/customers');
     customersData = await custRes.json();
     renderMetersPage();
     alert(`✅ Synced ${data.count} customers from Google Sheets!`);
@@ -952,7 +985,7 @@ async function renderAlarmsPage() {
 
   // ── No-consumption alarms (fetched from server) ──
   try {
-    const res = await fetch('http://localhost:3000/api/alarms/no-consumption');
+    const res = await fetch('/api/alarms/no-consumption');
     const noConsAlarms = await res.json();
     document.getElementById('nocons-count').textContent = noConsAlarms.length+' alarm'+(noConsAlarms.length!==1?'s':'');
 
@@ -1094,7 +1127,7 @@ async function sendProblemAlert(idx) {
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Sending…'; }
 
   try {
-    const res = await fetch('http://localhost:3000/api/alarms/send-problem-alert', {
+    const res = await fetch('/api/alarms/send-problem-alert', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sn, devEUI, appName, email, customerName })
@@ -1454,7 +1487,7 @@ function renderHistTable(hist) {
 async function manualRefresh(){
   const btn=document.getElementById('rbtn');
   btn.disabled=true;btn.innerHTML='<span class="spin"></span>';
-  try{await fetch('http://localhost:3000/api/refresh');await fetchData();}catch(e){}
+  try{await fetch('/api/refresh');await fetchData();}catch(e){}
   btn.disabled=false;btn.innerHTML='↻ Refresh';
 }
 function resetCountdown(){

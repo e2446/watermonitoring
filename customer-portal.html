@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Redlink Water — My Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05070e;--bg2:#0a0d18;--bg3:#0f1220;--bg4:#141828;
+  --border:#1a2035;--border2:#222840;
+  --text:#e2e8ff;--muted:#5a6490;--muted2:#343d5c;
+  --cyan:#00e5ff;--cyan2:#00b4cc;--cyan3:#006680;
+  --water:#1de9b6;--water2:#00897b;
+  --green:#00e676;--red:#ff5252;--amber:#ffca28;--violet:#7c4dff;
+  --pjs:'Plus Jakarta Sans',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --r:12px;--r2:8px;--r3:18px;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--pjs);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+/* ─── PARTICLE BG ─── */
+.bg-layer{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.bg-wave{
+  position:absolute;bottom:-120px;left:-10%;width:120%;height:400px;
+  background:conic-gradient(from 200deg at 50% 80%, transparent 20%,rgba(0,229,255,.03) 40%,transparent 60%);
+  animation:waveDrift 12s ease-in-out infinite alternate;
+}
+.bg-dot{
+  position:absolute;width:1px;height:1px;background:var(--cyan);border-radius:50%;
+  animation:dotFloat var(--dur,8s) ease-in-out infinite;opacity:var(--op,.3);
+}
+@keyframes waveDrift{from{transform:translateX(-3%) scaleX(1)}to{transform:translateX(3%) scaleX(1.04)}}
+@keyframes dotFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+.bg-circle{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none}
+.bc1{width:600px;height:600px;top:-200px;right:-150px;background:rgba(0,229,255,.04)}
+.bc2{width:500px;height:500px;bottom:-150px;left:-100px;background:rgba(29,233,182,.03)}
+
+/* ─── VIEWS ─── */
+.view{display:none;position:relative;z-index:1}
+.view.active{display:block}
+
+/* ═══ LANDING ═══ */
+.landing{min-height:100vh;display:flex;flex-direction:column}
+
+/* TOPBAR */
+.top-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 40px;height:64px;
+  background:rgba(10,13,24,.8);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);
+  position:sticky;top:0;z-index:50;
+}
+.top-logo{display:flex;align-items:center;gap:12px}
+.top-logo-mark{
+  width:36px;height:36px;
+  background:linear-gradient(135deg,var(--cyan),var(--water));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+}
+.top-logo-mark svg{width:18px;height:18px;fill:none;stroke:#000;stroke-width:2.5}
+.top-logo-name{font-size:16px;font-weight:800;letter-spacing:-.02em}
+.top-logo-name b{color:var(--cyan)}
+.top-logo-badge{font-size:9px;background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.2);color:var(--cyan);padding:2px 8px;border-radius:99px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.top-nav-link{font-size:13px;color:var(--muted);text-decoration:none;transition:color .2s}
+.top-nav-link:hover{color:var(--text)}
+
+/* HERO */
+.hero{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  padding:60px 24px;
+}
+.hero-inner{width:100%;max-width:1000px;display:grid;grid-template-columns:1fr 420px;gap:60px;align-items:center}
+.hero-text{}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;
+  color:var(--cyan);background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.15);
+  padding:5px 14px;border-radius:99px;margin-bottom:20px;
+}
+.hero-eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero-h1{font-size:48px;font-weight:800;line-height:1.12;letter-spacing:-.03em;margin-bottom:16px}
+.hero-h1 span{
+  background:linear-gradient(90deg,var(--cyan),var(--water));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-sub{font-size:16px;color:var(--muted);line-height:1.7;margin-bottom:32px;max-width:420px}
+.hero-features{display:flex;flex-direction:column;gap:10px}
+.hf{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
+.hf-dot{width:7px;height:7px;border-radius:50%;background:var(--water);flex-shrink:0}
+
+/* AUTH CARD */
+.auth-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--r3);overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(0,229,255,.03);
+  animation:cardUp .5s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes cardUp{from{opacity:0;transform:translateY(28px) scale(.98)}to{opacity:1;transform:none}}
+.auth-card-head{
+  padding:24px 28px 18px;
+  background:linear-gradient(135deg,rgba(0,229,255,.05),rgba(29,233,182,.03));
+  border-bottom:1px solid var(--border);
+}
+.auth-card-title{font-size:17px;font-weight:700;margin-bottom:2px}
+.auth-card-sub{font-size:12px;color:var(--muted)}
+.auth-card-body{padding:24px 28px 28px}
+.auth-card-foot{padding:0 28px 22px;text-align:center;font-size:12px;color:var(--muted)}
+.auth-card-foot a{color:var(--cyan);text-decoration:none}
+
+/* TABS */
+.tab-strip{display:flex;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:20px}
+.atab{
+  flex:1;padding:8px 4px;text-align:center;font-size:11px;font-weight:600;
+  color:var(--muted);cursor:pointer;border-radius:7px;transition:all .18s;
+  font-family:var(--pjs);border:none;background:none;
+}
+.atab.on{background:var(--bg4);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.atab.on.mgmt-tab{background:rgba(0,137,123,.2);color:#1de9b6;box-shadow:0 2px 8px rgba(29,233,182,.15)}
+.tab-body{display:none}.tab-body.on{display:block}
+
+/* FORM */
+.fld{margin-bottom:14px}
+.fld-lbl{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px}
+.fld-wrap{position:relative}
+.fld-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:15px;pointer-events:none}
+.fld input{
+  width:100%;padding:11px 14px 11px 40px;
+  background:var(--bg3);border:1.5px solid var(--border2);
+  border-radius:9px;font-size:14px;color:var(--text);
+  font-family:var(--pjs);outline:none;transition:border-color .2s,background .2s;
+}
+.fld input:focus{border-color:rgba(0,229,255,.45);background:rgba(0,229,255,.03)}
+.fld input::placeholder{color:var(--muted2)}
+.fld-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5}
+
+/* BUTTONS */
+.btn-p{
+  width:100%;padding:12px;
+  background:linear-gradient(135deg,var(--cyan),var(--water));
+  border:none;border-radius:9px;
+  font-size:14px;font-weight:700;color:#000;
+  cursor:pointer;font-family:var(--pjs);
+  transition:all .2s;box-shadow:0 4px 24px rgba(0,229,255,.2);
+}
+.btn-p:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 32px rgba(0,229,255,.3)}
+.btn-p:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-g{
+  width:100%;padding:10px;margin-top:8px;
+  background:transparent;border:1.5px solid var(--border2);
+  border-radius:9px;font-size:13px;color:var(--muted);
+  cursor:pointer;font-family:var(--pjs);transition:all .18s;
+}
+.btn-g:hover{border-color:rgba(0,229,255,.3);color:var(--text)}
+
+/* ALERTS */
+.al{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none;line-height:1.5}
+.al-err{background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.2);color:#ff8a8a}
+.al-ok{background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.2);color:var(--green)}
+.al.show{display:block}
+
+/* OTP SUCCESS BOX */
+.otp-box{background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:10px;padding:16px;margin-bottom:18px;font-size:13px;color:var(--muted);line-height:1.7}
+.otp-box strong{color:var(--cyan)}
+
+/* SPINNER */
+.spin-sm{display:inline-block;width:13px;height:13px;border:2px solid rgba(0,0,0,.2);border-top-color:rgba(0,0,0,.7);border-radius:50%;animation:spinit .65s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spinit{to{transform:rotate(360deg)}}
+
+/* DIVIDER */
+.divid{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--muted2);font-size:11px}
+.divid::before,.divid::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ═══ DASHBOARD ═══ */
+#dash-view{min-height:100vh;display:none;flex-direction:column}
+#dash-view.active{display:flex}
+
+/* DASH NAV */
+.dash-top{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:60px;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.dash-logo{display:flex;align-items:center;gap:10px}
+.dash-logo-mark{width:30px;height:30px;background:linear-gradient(135deg,var(--cyan),var(--water));border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.dash-logo-mark svg{width:15px;height:15px;fill:none;stroke:#000;stroke-width:2.5}
+.dash-logo-name{font-size:14px;font-weight:800;letter-spacing:-.02em}
+.dash-logo-name b{color:var(--cyan)}
+.dash-right{display:flex;align-items:center;gap:14px}
+.dash-user-info{text-align:right}
+.dash-cust-name{font-size:13px;font-weight:600}
+.dash-cust-tag{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.dash-avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,var(--water2),var(--cyan2));
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:#fff;flex-shrink:0;
+}
+.dash-logout{
+  padding:6px 14px;background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.2);
+  color:var(--red);border-radius:7px;font-size:12px;cursor:pointer;
+  font-family:var(--pjs);font-weight:600;transition:all .15s;
+}
+.dash-logout:hover{background:rgba(255,82,82,.15)}
+
+/* DASH TABS */
+.dash-tabs{
+  display:flex;gap:0;
+  background:var(--bg2);border-bottom:2px solid var(--border);
+  padding:0 28px;
+  position:sticky;top:60px;z-index:99;
+}
+.dtab{
+  padding:14px 20px;font-size:13px;font-weight:600;
+  color:var(--muted);cursor:pointer;border:none;background:none;
+  font-family:var(--pjs);border-bottom:2px solid transparent;
+  margin-bottom:-2px;transition:all .18s;white-space:nowrap;
+}
+.dtab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
+.dtab:hover:not(.on){color:var(--text)}
+.dash-panel{display:none;padding:24px 28px;max-width:1120px;width:100%;margin:0 auto}
+.dash-panel.on{display:block}
+
+/* HERO STRIP */
+.meter-strip{
+  background:linear-gradient(135deg,rgba(0,229,255,.06),rgba(29,233,182,.04));
+  border:1px solid rgba(0,229,255,.1);border-radius:var(--r);
+  padding:20px 24px;margin-bottom:22px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
+}
+.ms-left{}
+.ms-eyebrow{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+.ms-name{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+.ms-tags{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ms-tag{
+  font-family:var(--mono);font-size:11px;
+  background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.18);
+  color:var(--cyan);padding:3px 10px;border-radius:6px;
+}
+.ms-addr{font-size:12px;color:var(--muted)}
+.ms-right{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.status-pill{display:flex;align-items:center;gap:7px;padding:9px 16px;border-radius:9px;font-size:13px;font-weight:700}
+.sp-online{background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.18);color:var(--green)}
+.sp-offline{background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.18);color:var(--red)}
+.sp-stale{background:rgba(255,202,40,.08);border:1px solid rgba(255,202,40,.18);color:var(--amber)}
+.sp-dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.sp-online .sp-dot{animation:blink 2s infinite}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;background:var(--kc)}
+.kpi-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.kpi-val{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--kc);line-height:1}
+.kpi-unit{font-size:12px;color:var(--muted);font-weight:400}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* SECTION CARD */
+.sec{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:18px;overflow:hidden}
+.sec-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.sec-title{font-size:14px;font-weight:700;display:flex;align-items:center;gap:9px}
+.sec-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.sec-body{padding:16px 20px}
+
+/* PERIOD TABS */
+.ptabs{display:flex;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:3px}
+.ptab{
+  padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;
+  color:var(--muted);cursor:pointer;border:none;background:none;
+  font-family:var(--pjs);transition:all .15s;
+}
+.ptab:hover{color:var(--text)}
+.ptab.on{background:var(--bg2);color:var(--text);box-shadow:0 1px 5px rgba(0,0,0,.4)}
+
+/* CHART */
+.chart-wrap{height:220px;position:relative}
+
+/* HISTORY TABLE */
+.hist-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.hist-tbl th{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);padding:8px 12px;text-align:left;
+  background:var(--bg3);border-bottom:1px solid var(--border);
+}
+.hist-tbl td{padding:9px 12px;border-bottom:1px solid rgba(26,32,53,.6);font-size:12px}
+.hist-tbl tr:last-child td{border-bottom:none}
+.hist-tbl tr:hover td{background:rgba(255,255,255,.015)}
+.mono{font-family:var(--mono)}
+.cpos{color:var(--green)}.cneg{color:var(--red)}.czero{color:var(--muted)}
+
+/* BILL GRID */
+.bill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.bill-card{background:var(--bg3);border:1px solid var(--border);border-radius:11px;overflow:hidden}
+.bill-card-head{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between}
+.bill-period-label{font-size:13px;font-weight:700}
+.bill-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px}
+.bill-due{background:rgba(255,202,40,.1);color:var(--amber);border:1px solid rgba(255,202,40,.2)}
+.bill-overdue{background:rgba(255,82,82,.1);color:var(--red);border:1px solid rgba(255,82,82,.2)}
+.bill-paid{background:rgba(0,230,118,.08);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.bill-body{padding:0 16px 14px}
+.bill-row{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(26,32,53,.6)}
+.bill-row:last-child{border:none;font-size:13px;font-weight:700;padding-top:10px}
+.bill-row span:first-child{color:var(--muted)}
+.bill-total-num{font-family:var(--mono);color:var(--cyan)}
+
+/* NO DATA */
+.no-data{text-align:center;padding:48px 24px;color:var(--muted);font-size:14px}
+.no-data-icon{font-size:40px;margin-bottom:12px}
+
+/* LOADING SPLASH */
+.splash{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:999;transition:opacity .4s,visibility .4s;
+}
+.splash.hide{opacity:0;visibility:hidden;pointer-events:none}
+.splash-icon{font-size:48px;margin-bottom:16px;animation:pulse2 1.4s ease infinite}
+@keyframes pulse2{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.splash-text{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.splash-bar{width:180px;height:2px;background:var(--border);border-radius:2px;margin-top:16px;overflow:hidden}
+.splash-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--water));border-radius:2px;animation:loadbar 1.4s ease infinite}
+@keyframes loadbar{0%{width:0;margin-left:0}60%{width:60%;margin-left:20%}100%{width:0;margin-left:100%}}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .hero-inner{grid-template-columns:1fr;gap:40px}
+  .hero-h1{font-size:34px}
+  .top-bar{padding:0 20px}
+  .dash-top,.dash-tabs{padding-left:16px;padding-right:16px}
+  .dash-panel{padding:16px}
+  .meter-strip{flex-direction:column;align-items:flex-start}
+  .kpi-val{font-size:22px}
+}
+@media(max-width:480px){
+  .auth-card-body{padding:18px 20px 20px}
+  .hist-tbl th,.hist-tbl td{padding:7px 8px}
+  .hist-tbl{font-size:11px}
+  .dtab{padding:12px 12px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<!-- ANIMATED BG -->
+<div class="bg-layer" aria-hidden="true">
+  <div class="bg-wave"></div>
+  <div class="bg-circle bc1"></div>
+  <div class="bg-circle bc2"></div>
+  <div class="bg-dot" style="top:15%;left:8%;--dur:9s;--op:.25"></div>
+  <div class="bg-dot" style="top:35%;left:22%;--dur:7s;--op:.2"></div>
+  <div class="bg-dot" style="top:60%;left:5%;--dur:11s;--op:.15"></div>
+  <div class="bg-dot" style="top:20%;right:12%;--dur:8s;--op:.22"></div>
+  <div class="bg-dot" style="top:55%;right:6%;--dur:6s;--op:.18"></div>
+  <div class="bg-dot" style="top:80%;right:20%;--dur:10s;--op:.12"></div>
+</div>
+
+<!-- LOADING SPLASH -->
+<div class="splash" id="splash">
+  <div class="splash-icon">💧</div>
+  <div class="splash-text">Loading portal…</div>
+  <div class="splash-bar"><div class="splash-fill"></div></div>
+</div>
+
+<!-- ══════════════════════════════════
+     LANDING / LOGIN VIEW
+══════════════════════════════════ -->
+<div class="view active" id="landing-view">
+  <div class="landing">
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+      <div class="top-logo">
+        <div class="top-logo-mark">
+          <svg viewBox="0 0 20 20"><path d="M10 2C10 2 4 8.5 4 13a6 6 0 0012 0C16 8.5 10 2 10 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="top-logo-name"><b>Redlink</b> Water</div>
+        <div class="top-logo-badge">LoRaWAN Smart Metering</div>
+      </div>
+      <a href="#" class="top-nav-link" onclick="document.getElementById('auth-card').scrollIntoView({behavior:'smooth'});return false">Sign In →</a>
+    </header>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-inner">
+        <!-- LEFT: COPY -->
+        <div class="hero-text">
+          <div class="hero-eyebrow">
+            <span class="hero-eyebrow-dot"></span>
+            Customer Self-Service Portal
+          </div>
+          <h1 class="hero-h1">Your Water.<br><span>Your Data.</span><br>Anytime.</h1>
+          <p class="hero-sub">View real-time meter readings, consumption trends, and monthly bills — all in one place. No app download needed.</p>
+          <div class="hero-features">
+            <div class="hf"><div class="hf-dot"></div>Live meter status &amp; valve state</div>
+            <div class="hf"><div class="hf-dot"></div>Daily &amp; monthly consumption history</div>
+            <div class="hf"><div class="hf-dot"></div>Auto-calculated billing breakdown</div>
+            <div class="hf"><div class="hf-dot"></div>Battery &amp; signal strength monitoring</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: AUTH CARD -->
+        <div id="auth-card">
+          <div class="auth-card">
+            <div class="auth-card-head">
+              <div class="auth-card-title">💧 Sign In</div>
+              <div class="auth-card-sub">Customers and management use the same login</div>
+            </div>
+
+            <div class="auth-card-body">
+
+              <!-- ── UNIFIED LOGIN ── -->
+              <div id="panel-login">
+                <div class="al al-err" id="login-err"></div>
+                <div class="al al-ok"  id="login-ok"></div>
+
+                <div class="fld">
+                  <label class="fld-lbl">Username / Meter No. / Name</label>
+                  <div class="fld-wrap">
+                    <span class="fld-icon">👤</span>
+                    <input type="text" id="login-id" placeholder="e.g. redlinkcebu · meter serial · your name"
+                      autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+                  </div>
+                  <div class="fld-hint">Management staff: enter your username &nbsp;·&nbsp; Customers: enter meter no. or your name</div>
+                </div>
+
+                <div class="fld">
+                  <label class="fld-lbl">Password</label>
+                  <div class="fld-wrap">
+                    <span class="fld-icon">🔑</span>
+                    <input type="password" id="login-pw" placeholder="Your password"
+                      autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+                  </div>
+                </div>
+
+                <button class="btn-p" id="login-btn" onclick="doLogin()">Sign In</button>
+                <div class="divid">are you a customer without a password?</div>
+                <button class="btn-g" onclick="showPanel('request')">📧 Get Password via Email →</button>
+              </div>
+
+              <!-- ── REQUEST PASSWORD PANEL ── -->
+              <div id="panel-request" style="display:none">
+                <div class="al al-err" id="req-err"></div>
+                <div class="al al-ok"  id="req-ok"></div>
+
+                <div id="req-s1">
+                  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.7">Enter the email address registered to your account. We'll send a one-time password to your inbox.</p>
+                  <div class="fld">
+                    <label class="fld-lbl">Registered Email Address</label>
+                    <div class="fld-wrap">
+                      <span class="fld-icon">📮</span>
+                      <input type="email" id="req-email" placeholder="yourname@email.com" onkeydown="if(event.key==='Enter')requestPassword()">
+                    </div>
+                  </div>
+                  <button class="btn-p" id="req-btn" onclick="requestPassword()">Send My Password</button>
+                  <button class="btn-g" onclick="showPanel('login')">← Back to Login</button>
+                </div>
+
+                <div id="req-s2" style="display:none">
+                  <div class="otp-box">
+                    ✅ Password sent to <strong id="req-email-shown"></strong>.<br><br>
+                    Check your inbox then use that password to log in. Valid for <strong>24 hours</strong>.
+                  </div>
+                  <button class="btn-p" onclick="showPanel('login')">→ Back to Login</button>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="auth-card-foot">
+              Need help? <a href="mailto:redlinkresearchdevelopment@gmail.com">Contact Support</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     DASHBOARD VIEW
+══════════════════════════════════ -->
+<div class="view" id="dash-view">
+
+  <!-- TOP NAV -->
+  <nav class="dash-top">
+    <div class="dash-logo">
+      <div class="dash-logo-mark">
+        <svg viewBox="0 0 20 20"><path d="M10 2C10 2 4 8.5 4 13a6 6 0 0012 0C16 8.5 10 2 10 2z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="dash-logo-name"><b>Redlink</b> Water</div>
+    </div>
+    <div class="dash-right">
+      <div class="dash-user-info">
+        <div class="dash-cust-name" id="nav-name">—</div>
+        <div class="dash-cust-tag" id="nav-tag">—</div>
+      </div>
+      <div class="dash-avatar" id="nav-avatar">?</div>
+      <button class="dash-logout" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+
+  <!-- TABS -->
+  <div class="dash-tabs" role="tablist">
+    <button class="dtab on" onclick="switchDashTab('overview',this)" role="tab">📊 Overview</button>
+    <button class="dtab" onclick="switchDashTab('history',this)" role="tab">📋 History</button>
+    <button class="dtab" onclick="switchDashTab('trends',this)" role="tab">📈 Trends</button>
+    <button class="dtab" onclick="switchDashTab('bills',this)" role="tab">🧾 Bills</button>
+  </div>
+
+  <!-- ── OVERVIEW ── -->
+  <div class="dash-panel on" id="panel-overview">
+
+    <!-- METER STRIP -->
+    <div class="meter-strip">
+      <div class="ms-left">
+        <div class="ms-eyebrow">My Water Meter</div>
+        <div class="ms-name" id="hero-name">—</div>
+        <div class="ms-tags">
+          <div class="ms-tag" id="hero-meter-tag">—</div>
+          <div class="ms-tag" id="hero-eui">—</div>
+          <div class="ms-addr" id="hero-addr">—</div>
+        </div>
+      </div>
+      <div class="ms-right">
+        <div class="status-pill sp-offline" id="hero-status">
+          <div class="sp-dot"></div>
+          <span id="hero-status-txt">—</span>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px">Last Seen</div>
+          <div class="mono" style="font-size:12px;color:var(--text)" id="hero-last-seen">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI CARDS -->
+    <div class="kpi-grid">
+      <div class="kpi" style="--kc:var(--cyan)">
+        <div class="kpi-lbl">Current Reading</div>
+        <div class="kpi-val" id="kpi-reading">—</div>
+        <div class="kpi-sub" id="kpi-reading-sub">m³</div>
+      </div>
+      <div class="kpi" style="--kc:var(--water)">
+        <div class="kpi-lbl">This Month</div>
+        <div class="kpi-val" id="kpi-month">—</div>
+        <div class="kpi-sub">m³ consumed</div>
+      </div>
+      <div class="kpi" style="--kc:var(--green)">
+        <div class="kpi-lbl">Last 7 Days</div>
+        <div class="kpi-val" id="kpi-7d">—</div>
+        <div class="kpi-sub">m³ consumed</div>
+      </div>
+      <div class="kpi" style="--kc:var(--amber)">
+        <div class="kpi-lbl">Battery</div>
+        <div class="kpi-val" id="kpi-bat">—</div>
+        <div class="kpi-sub">meter battery</div>
+      </div>
+      <div class="kpi" style="--kc:var(--violet)">
+        <div class="kpi-lbl">Signal RSSI</div>
+        <div class="kpi-val" id="kpi-rssi">—</div>
+        <div class="kpi-sub">dBm</div>
+      </div>
+    </div>
+
+    <!-- QUICK CHART -->
+    <div class="sec">
+      <div class="sec-head">
+        <div class="sec-title">
+          <div class="sec-icon" style="background:rgba(0,229,255,.1)">📊</div>
+          Quick Consumption (7 Days)
+        </div>
+      </div>
+      <div class="sec-body">
+        <div class="chart-wrap"><canvas id="quick-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- METER DETAILS -->
+    <div class="sec">
+      <div class="sec-head">
+        <div class="sec-title">
+          <div class="sec-icon" style="background:rgba(29,233,182,.1)">ℹ️</div>
+          Meter & Account Details
+        </div>
+      </div>
+      <div class="sec-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px" id="details-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HISTORY ── -->
+  <div class="dash-panel" id="panel-history">
+    <div class="sec">
+      <div class="sec-head">
+        <div class="sec-title">
+          <div class="sec-icon" style="background:rgba(124,77,255,.1)">📋</div>
+          Reading History
+        </div>
+        <span style="font-size:12px;color:var(--muted)" id="hist-count">0 records</span>
+      </div>
+      <div class="sec-body" style="padding:0;overflow-x:auto">
+        <table class="hist-tbl">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Reading (m³)</th>
+              <th>Consumption</th>
+              <th>Battery</th>
+              <th>RSSI</th>
+              <th>Valve</th>
+            </tr>
+          </thead>
+          <tbody id="hist-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TRENDS ── -->
+  <div class="dash-panel" id="panel-trends">
+    <!-- CONSUMPTION CHART -->
+    <div class="sec" style="margin-bottom:18px">
+      <div class="sec-head">
+        <div class="sec-title">
+          <div class="sec-icon" style="background:rgba(0,230,118,.1)">📈</div>
+          Daily Consumption Trend
+        </div>
+        <div class="ptabs">
+          <button class="ptab on" onclick="setConsPeriod('7d',this)">7 Days</button>
+          <button class="ptab" onclick="setConsPeriod('30d',this)">30 Days</button>
+          <button class="ptab" onclick="setConsPeriod('all',this)">All</button>
+        </div>
+      </div>
+      <div class="sec-body">
+        <div class="chart-wrap"><canvas id="cons-chart"></canvas></div>
+      </div>
+    </div>
+    <!-- READING CHART -->
+    <div class="sec">
+      <div class="sec-head">
+        <div class="sec-title">
+          <div class="sec-icon" style="background:rgba(0,229,255,.1)">💹</div>
+          Cumulative Meter Reading
+        </div>
+        <div class="ptabs">
+          <button class="ptab on" onclick="setReadingPeriod('7d',this)">7 Days</button>
+          <button class="ptab" onclick="setReadingPeriod('30d',this)">30 Days</button>
+          <button class="ptab" onclick="setReadingPeriod('all',this)">All</button>
+        </div>
+      </div>
+      <div class="sec-body">
+        <div class="chart-wrap"><canvas id="reading-chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── BILLS ── -->
+  <div class="dash-panel" id="panel-bills">
+    <div class="sec" style="margin-bottom:18px">
+      <div class="sec-head">
+        <div class="sec-title">
+          <div class="sec-icon" style="background:rgba(255,202,40,.1)">🧾</div>
+          Monthly Bills
+        </div>
+        <div style="font-size:11px;color:var(--muted)">Auto-calculated from consumption</div>
+      </div>
+      <div class="sec-body" id="bill-summary" style="display:none">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:4px" id="bill-kpis"></div>
+      </div>
+    </div>
+    <div id="bill-grid" class="bill-grid"></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG & RATES
+// ═══════════════════════════════════════════════════════════
+const RATES = {
+  minCubic: 10, minCharge: 170,
+  perCubic: 14, envFee: 5,
+  sysCharge: 22.85, vatPct: 12
+};
+
+let session = null;
+let consChart = null, readChart = null, quickChart = null;
+let consPeriod = '30d', readPeriod = '30d';
+
+// ═══════════════════════════════════════════════════════════
+// PANEL SWITCHING (replaces tabs)
+// ═══════════════════════════════════════════════════════════
+function showPanel(id) {
+  document.getElementById('panel-login').style.display   = id === 'login'   ? '' : 'none';
+  document.getElementById('panel-request').style.display = id === 'request' ? '' : 'none';
+  if (id === 'request') {
+    document.getElementById('req-s1').style.display = '';
+    document.getElementById('req-s2').style.display = 'none';
+    hideAl('req-err'); hideAl('req-ok');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ALERTS
+// ═══════════════════════════════════════════════════════════
+function showAl(id, msg) { const el = document.getElementById(id); el.textContent = msg; el.classList.add('show'); }
+function hideAl(id) { const el = document.getElementById(id); if(el) { el.classList.remove('show'); el.textContent = ''; } }
+
+// ═══════════════════════════════════════════════════════════
+// REQUEST PASSWORD
+// ═══════════════════════════════════════════════════════════
+async function requestPassword() {
+  const email = document.getElementById('req-email').value.trim();
+  hideAl('req-err'); hideAl('req-ok');
+  if (!email) { showAl('req-err', 'Please enter your registered email address.'); return; }
+  const btn = document.getElementById('req-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin-sm"></span> Sending…';
+  try {
+    const res = await fetch('/api/portal/request-password', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('req-email-shown').textContent = email;
+      document.getElementById('req-s1').style.display = 'none';
+      document.getElementById('req-s2').style.display = 'block';
+    } else {
+      showAl('req-err', data.message || 'Could not send password. Please try again.');
+    }
+  } catch(e) {
+    showAl('req-err', 'Cannot reach server. Make sure the server is running (node server.js).');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Send My Password';
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOGIN
+// ═══════════════════════════════════════════════════════════
+async function doLogin() {
+  const identifier = document.getElementById('login-id').value.trim();
+  const password   = document.getElementById('login-pw').value;
+  hideAl('login-err'); hideAl('login-ok');
+  if (!identifier || !password) { showAl('login-err', 'Please enter your identifier and password.'); return; }
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin-sm"></span> Signing in…';
+  try {
+    // ── First: try management login (catches staff entering credentials in wrong tab) ──
+    const mgmtRes  = await fetch('/api/mgmt/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username: identifier, password })
+    });
+    const mgmtData = await mgmtRes.json();
+    if (mgmtData.success) {
+      sessionStorage.setItem('mgmt_token', mgmtData.token);
+      sessionStorage.setItem('mgmt_user', JSON.stringify({
+        username: mgmtData.username,
+        appId:    mgmtData.appId,
+        appName:  mgmtData.appName,
+        org:      mgmtData.org
+      }));
+      window.location.href = '/index.html';
+      return;
+    }
+    // ── Second: try customer portal login ──
+    const res = await fetch('/api/portal/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ identifier, password })
+    });
+    const data = await res.json();
+    if (data.success) {
+      session = data;
+      renderDashboard();
+      document.getElementById('landing-view').classList.remove('active');
+      document.getElementById('dash-view').classList.add('active');
+      window.scrollTo(0,0);
+    } else {
+      showAl('login-err', data.message || 'Login failed.');
+    }
+  } catch(e) {
+    showAl('login-err', 'Cannot reach server. Make sure the server is running (node server.js).');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Sign In to My Account';
+}
+
+// ═══════════════════════════════════════════════════════════
+// LOGOUT
+// ═══════════════════════════════════════════════════════════
+function doLogout() {
+  session = null;
+  [consChart, readChart, quickChart].forEach(c => { if(c) { c.destroy(); } });
+  consChart = readChart = quickChart = null;
+  document.getElementById('login-id').value = '';
+  document.getElementById('login-pw').value = '';
+  document.getElementById('dash-view').classList.remove('active');
+  document.getElementById('landing-view').classList.add('active');
+  showPanel('login');
+}
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD TABS
+// ═══════════════════════════════════════════════════════════
+function switchDashTab(id, btn) {
+  document.querySelectorAll('.dtab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('panel-' + id).classList.add('on');
+  if (id === 'trends') { renderConsChart(); renderReadChart(); }
+  if (id === 'history') renderHistTable();
+  if (id === 'bills') renderBills();
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function renderDashboard() {
+  const { customer, node, history: hist } = session;
+  const c = customer || {};
+  const n = node || {};
+
+  // NAV
+  const initials = (c.fullName||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  document.getElementById('nav-name').textContent = c.fullName || '—';
+  document.getElementById('nav-tag').textContent  = c.meterTagNumber || '—';
+  document.getElementById('nav-avatar').textContent = initials;
+
+  // HERO
+  document.getElementById('hero-name').textContent = c.fullName || '—';
+  document.getElementById('hero-meter-tag').textContent = 'MTN: ' + (c.meterTagNumber || '—');
+  document.getElementById('hero-eui').textContent = 'EUI: ' + (n.devEUI || '—');
+  document.getElementById('hero-addr').textContent = c.address || '';
+
+  // STATUS
+  const lastTs = hist.length ? hist[hist.length-1].ts : null;
+  const minutesSince = lastTs ? (Date.now() - new Date(lastTs)) / 60000 : Infinity;
+  const statusEl = document.getElementById('hero-status');
+  const statusTxt = document.getElementById('hero-status-txt');
+  statusEl.className = 'status-pill';
+  if (minutesSince < 120) {
+    statusEl.classList.add('sp-online'); statusTxt.textContent = 'Online';
+  } else if (minutesSince < 1440) {
+    statusEl.classList.add('sp-stale'); statusTxt.textContent = 'Idle';
+  } else {
+    statusEl.classList.add('sp-offline'); statusTxt.textContent = 'Offline';
+  }
+  document.getElementById('hero-last-seen').textContent = lastTs ? fmtDate(lastTs) : '—';
+
+  // KPIs
+  const latest = hist.length ? hist[hist.length-1] : {};
+  document.getElementById('kpi-reading').textContent = latest.meterReading != null ? parseFloat(latest.meterReading).toFixed(3) : '—';
+  document.getElementById('kpi-reading-sub').textContent = latest.ts ? 'as of ' + fmtDate(latest.ts) : 'm³';
+  document.getElementById('kpi-bat').textContent = latest.battery != null ? latest.battery + '%' : '—';
+  document.getElementById('kpi-rssi').textContent = latest.rssi != null ? latest.rssi + '' : '—';
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const weekAgo    = new Date(now.getTime() - 7*86400000);
+  document.getElementById('kpi-month').textContent = calcConsumption(hist.filter(h => h.ts && new Date(h.ts) >= monthStart)).toFixed(3);
+  document.getElementById('kpi-7d').textContent    = calcConsumption(hist.filter(h => h.ts && new Date(h.ts) >= weekAgo)).toFixed(3);
+
+  // DETAILS GRID
+  const details = [
+    {lbl:'Full Name',val:c.fullName||'—'},
+    {lbl:'Meter Tag Number',val:c.meterTagNumber||'—',mono:true},
+    {lbl:'Device EUI',val:n.devEUI||'—',mono:true},
+    {lbl:'Address',val:c.address||'—'},
+    {lbl:'Contact',val:c.contactNumber||'—'},
+    {lbl:'Email',val:c.emailAddress||'—'},
+    {lbl:'Valve State',val:latest.valve||'—',color:latest.valve?.toLowerCase()==='open'?'var(--green)':'var(--red)'},
+    {lbl:'Registered',val:c.timestamp||'—'},
+  ];
+  document.getElementById('details-grid').innerHTML = details.map(d=>`
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px 14px">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px">${d.lbl}</div>
+      <div style="font-size:13px;${d.mono?'font-family:var(--mono);':''}${d.color?'color:'+d.color+';font-weight:700;':''}">${d.val}</div>
+    </div>`).join('');
+
+  // QUICK CHART
+  renderQuickChart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CALC HELPERS
+// ═══════════════════════════════════════════════════════════
+function calcConsumption(hist) {
+  if (!hist.length) return 0;
+  const readings = hist.filter(h => h.meterReading != null).map(h => parseFloat(h.meterReading));
+  if (readings.length < 2) return 0;
+  return Math.max(0, readings[readings.length-1] - readings[0]);
+}
+
+function getHistForPeriod(period) {
+  const hist = session?.history || [];
+  const now = new Date();
+  if (period === '7d')  return hist.filter(h => h.ts && (now - new Date(h.ts)) <= 7*86400000);
+  if (period === '30d') return hist.filter(h => h.ts && (now - new Date(h.ts)) <= 30*86400000);
+  return hist;
+}
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+
+function rssiColor(v) {
+  if (v == null) return 'var(--muted)';
+  return parseInt(v) >= -80 ? 'var(--green)' : parseInt(v) >= -100 ? 'var(--amber)' : 'var(--red)';
+}
+
+const CHART_OPTS = (yLabel) => ({
+  responsive:true, maintainAspectRatio:false,
+  interaction:{mode:'index',intersect:false},
+  plugins:{
+    legend:{display:false},
+    tooltip:{
+      backgroundColor:'rgba(10,13,24,.95)',
+      borderColor:'rgba(0,229,255,.2)',borderWidth:1,
+      titleColor:'#e2e8ff',bodyColor:'#5a6490',
+      callbacks:{label:v=>`${v.parsed.y?.toFixed?.(3)||v.parsed.y} ${yLabel}`}
+    }
+  },
+  scales:{
+    x:{ticks:{color:'#5a6490',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(26,32,53,.8)'}},
+    y:{ticks:{color:'#5a6490',font:{size:10}},grid:{color:'rgba(26,32,53,.8)'}}
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// QUICK CHART (overview)
+// ═══════════════════════════════════════════════════════════
+function renderQuickChart() {
+  const hist = getHistForPeriod('7d');
+  if (quickChart) { quickChart.destroy(); quickChart = null; }
+  if (!hist.length) return;
+  const step = Math.max(1, Math.floor(hist.length / 40));
+  const s = hist.filter((_,i) => i % step === 0);
+  const ctx = document.getElementById('quick-chart').getContext('2d');
+  quickChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: s.map(h => { const d = new Date(h.ts); return d.toLocaleDateString('en-PH',{month:'short',day:'numeric'}); }),
+      datasets:[{
+        label:'m³',
+        data: s.map((h,i) => {
+          if (i === 0) return 0;
+          const prev = s[i-1];
+          if (h.meterReading == null || prev.meterReading == null) return 0;
+          return Math.max(0, parseFloat(h.meterReading) - parseFloat(prev.meterReading));
+        }),
+        backgroundColor:'rgba(0,229,255,.25)',
+        borderColor:'rgba(0,229,255,.6)',
+        borderWidth:1,borderRadius:4,
+      }]
+    },
+    options: CHART_OPTS('m³')
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONSUMPTION TREND CHART
+// ═══════════════════════════════════════════════════════════
+function renderConsChart() {
+  const hist = getHistForPeriod(consPeriod);
+  if (consChart) { consChart.destroy(); consChart = null; }
+  if (!hist.length) return;
+  // Group by day
+  const dayMap = {};
+  hist.forEach(h => {
+    if (!h.ts || h.meterReading == null) return;
+    const d = new Date(h.ts).toLocaleDateString('en-PH',{month:'short',day:'numeric'});
+    if (!dayMap[d]) dayMap[d] = [];
+    dayMap[d].push(parseFloat(h.meterReading));
+  });
+  const days = Object.keys(dayMap);
+  const cons = days.map((d,i) => {
+    const readings = dayMap[d];
+    if (i === 0) return 0;
+    const prevKey = days[i-1];
+    const prevR = dayMap[prevKey];
+    return Math.max(0, readings[readings.length-1] - prevR[prevR.length-1]);
+  });
+  const ctx = document.getElementById('cons-chart').getContext('2d');
+  consChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels:days,
+      datasets:[{
+        label:'m³',data:cons,
+        backgroundColor:'rgba(29,233,182,.2)',borderColor:'rgba(29,233,182,.6)',
+        borderWidth:1,borderRadius:4
+      }]
+    },
+    options: CHART_OPTS('m³')
+  });
+}
+
+function setConsPeriod(p, btn) {
+  consPeriod = p;
+  btn.closest('.ptabs').querySelectorAll('.ptab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderConsChart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// READING CHART
+// ═══════════════════════════════════════════════════════════
+function renderReadChart() {
+  const hist = getHistForPeriod(readPeriod);
+  if (readChart) { readChart.destroy(); readChart = null; }
+  if (!hist.length) return;
+  const step = Math.max(1, Math.floor(hist.length / 60));
+  const s = hist.filter((_,i) => i % step === 0).filter(h => h.meterReading != null);
+  const ctx = document.getElementById('reading-chart').getContext('2d');
+  readChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: s.map(h => fmtDate(h.ts)),
+      datasets:[{
+        label:'m³', data: s.map(h => parseFloat(h.meterReading)),
+        borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,.05)',
+        borderWidth:2,pointRadius:2,tension:.3,fill:true
+      }]
+    },
+    options: CHART_OPTS('m³')
+  });
+}
+
+function setReadingPeriod(p, btn) {
+  readPeriod = p;
+  btn.closest('.ptabs').querySelectorAll('.ptab').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderReadChart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// HISTORY TABLE
+// ═══════════════════════════════════════════════════════════
+function renderHistTable() {
+  const hist = session?.history || [];
+  document.getElementById('hist-count').textContent = hist.length + ' records';
+  const tbody = document.getElementById('hist-tbody');
+  if (!hist.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="no-data"><div class="no-data-icon">📭</div>No history records yet.</div></td></tr>`;
+    return;
+  }
+  const withCons = hist.map((h,i) => {
+    const prev = i > 0 ? hist[i-1] : null;
+    let cons = null;
+    if (prev && h.meterReading != null && prev.meterReading != null)
+      cons = parseFloat(h.meterReading) - parseFloat(prev.meterReading);
+    return {...h, cons};
+  });
+  tbody.innerHTML = [...withCons].reverse().slice(0,200).map(h => {
+    const cv   = h.cons != null ? h.cons.toFixed(3) : null;
+    const ccls = cv == null ? 'czero' : h.cons > 0 ? 'cpos' : h.cons < 0 ? 'cneg' : 'czero';
+    const cdisp = cv == null ? '—' : (h.cons >= 0 ? '+' : '') + cv + ' m³';
+    const valve = h.valve ? `<span style="color:${h.valve.toLowerCase()==='open'?'var(--green)':'var(--red)'}">${h.valve}</span>` : '—';
+    return `<tr>
+      <td class="mono">${fmtDate(h.ts)}</td>
+      <td class="mono">${h.meterReading != null ? parseFloat(h.meterReading).toFixed(3) + ' m³' : '—'}</td>
+      <td class="mono ${ccls}">${cdisp}</td>
+      <td>${h.battery != null ? h.battery + '%' : '—'}</td>
+      <td class="mono" style="color:${rssiColor(h.rssi)}">${h.rssi != null ? h.rssi : '—'}</td>
+      <td>${valve}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// BILLS
+// ═══════════════════════════════════════════════════════════
+function calcBill(m3) {
+  const excess   = Math.max(0, m3 - RATES.minCubic);
+  const water    = m3 <= RATES.minCubic ? RATES.minCharge : RATES.minCharge + excess * RATES.perCubic;
+  const subtotal = water + RATES.envFee + RATES.sysCharge;
+  const vat      = subtotal * (RATES.vatPct / 100);
+  return { water, envFee:RATES.envFee, sysCharge:RATES.sysCharge, subtotal, vat, total:subtotal+vat };
+}
+
+function renderBills() {
+  const hist = session?.history || [];
+  const grid = document.getElementById('bill-grid');
+  if (hist.length < 2) {
+    grid.innerHTML = `<div class="no-data"><div class="no-data-icon">💸</div><div>No billing data yet.<br>Bills are generated from your consumption history.</div></div>`;
+    return;
+  }
+  const monthMap = {};
+  hist.forEach(h => {
+    if (!h.ts) return;
+    const d   = new Date(h.ts);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if (!monthMap[key]) monthMap[key] = [];
+    monthMap[key].push(h);
+  });
+  const months = Object.keys(monthMap).sort().reverse().slice(0,6);
+  if (!months.length) { grid.innerHTML = `<div class="no-data"><div class="no-data-icon">💸</div>No billing data.</div>`; return; }
+
+  const today = new Date();
+  let totalBilled = 0;
+  grid.innerHTML = months.map((mk, idx) => {
+    const mh       = monthMap[mk];
+    const consumed = calcConsumption(mh);
+    const bill     = calcBill(consumed);
+    totalBilled   += bill.total;
+    const [yr,mo]  = mk.split('-').map(Number);
+    const monthName = new Date(yr, mo-1).toLocaleString('en-PH',{month:'long',year:'numeric'});
+    const dueDate   = new Date(yr, mo-1, 25);
+    let bClass, bLabel;
+    if (idx === 0 && today < dueDate) { bClass='bill-due'; bLabel='Due '+dueDate.toLocaleDateString('en-PH',{month:'short',day:'numeric'}); }
+    else if (idx === 0 && today >= dueDate) { bClass='bill-overdue'; bLabel='⚠ Overdue'; }
+    else { bClass='bill-paid'; bLabel='✓ Paid'; }
+    return `<div class="bill-card">
+      <div class="bill-card-head">
+        <div class="bill-period-label">${monthName}</div>
+        <div class="bill-badge ${bClass}">${bLabel}</div>
+      </div>
+      <div class="bill-body">
+        <div class="bill-row"><span>Consumption</span><span class="mono">${consumed.toFixed(3)} m³</span></div>
+        <div class="bill-row"><span>Water Charge</span><span>₱${bill.water.toFixed(2)}</span></div>
+        <div class="bill-row"><span>Environmental Fee</span><span>₱${bill.envFee.toFixed(2)}</span></div>
+        <div class="bill-row"><span>System Charge</span><span>₱${bill.sysCharge.toFixed(2)}</span></div>
+        <div class="bill-row"><span>VAT (12%)</span><span>₱${bill.vat.toFixed(2)}</span></div>
+        <div class="bill-row"><span>TOTAL DUE</span><span class="bill-total-num">₱${bill.total.toFixed(2)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  setTimeout(() => document.getElementById('splash').classList.add('hide'), 600);
+});
+</script>
+</body>
+</html>

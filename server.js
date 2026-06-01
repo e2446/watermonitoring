@@ -2,6 +2,8 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+let bcrypt; try { bcrypt = require('bcryptjs'); } catch(e) { console.warn('[Portal] bcryptjs not available, using plain OTP'); }
 
 // ── Nodemailer (install with: npm install nodemailer) ──
 let nodemailer;
@@ -31,6 +33,13 @@ const CONFIG = {
     user:         'redlinkresearchdevelopment@gmail.com',
     appPassword:  'rpdd hpta qgxr ncko',
   },
+
+  // ── MANAGEMENT ACCOUNTS ─────────────────────────────────────────────────────
+  // Each account maps to one application only
+  mgmtAccounts: [
+    { username: 'redlinkcebu',  password: 'redlink', appName: 'Cyble-032026',             org: 'Redlink Cebu' },
+    { username: 'redlinkormoc', password: 'redlink', appName: 'PrepaidWaterMeter-042026',  org: 'Redlink Ormoc' },
+  ],
 
   // ── AUTO-BILLING SCHEDULER ─────────────────────────────────────────────────
   autoBilling: {
@@ -66,6 +75,9 @@ let lastUpdated = null;
 let tokenExpiry = 0;
 let history = {};
 let customers = {}; // { meterTagNumber: customerData }
+let portalPasswords = {};
+const portalPwFile = path.join(__dirname, 'portal_passwords.json');
+let mgmtSessions = {}; // { token: { username, appName, appId, org, ts } }
 
 // ── LOAD/SAVE CUSTOMERS ──
 function loadCustomers() {
@@ -355,6 +367,69 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // ── REDIRECT / → login.html ──
+  if (req.url === '/') {
+    res.writeHead(302, { Location: '/customer-portal.html' });
+    res.end();
+    return;
+  }
+
+  // ── POST /api/mgmt/login — management account login ──
+  if (req.method === 'POST' && req.url === '/api/mgmt/login') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      try {
+        const { username, password } = JSON.parse(body);
+        const acct = (CONFIG.mgmtAccounts || []).find(
+          a => a.username === username && a.password === password
+        );
+        if (!acct) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: 'Incorrect username or password.' }));
+          return;
+        }
+        // Find the app id for this account's appName
+        const appEntry = Object.entries(cachedData).find(([, v]) => v.name === acct.appName);
+        const appId = appEntry ? appEntry[0] : null;
+        // Generate a simple session token
+        const token = crypto.randomBytes(24).toString('hex');
+        // Store token → appName mapping (in-memory, resets on server restart — fine for local use)
+        mgmtSessions[token] = { username: acct.username, appName: acct.appName, appId, org: acct.org, ts: Date.now() };
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, token, username: acct.username, appName: acct.appName, appId, org: acct.org }));
+      } catch(e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, message: 'Bad request' }));
+      }
+    });
+    return;
+  }
+
+  // ── GET /api/mgmt/nodes — filtered nodes for the logged-in account ──
+  if (req.url === '/api/mgmt/nodes') {
+    const token = (req.headers['x-mgmt-token'] || '');
+    const sess = mgmtSessions[token];
+    if (!sess) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+    // Re-resolve appId each request (cachedData may have been refreshed)
+    const appEntry = Object.entries(cachedData).find(([, v]) => v.name === sess.appName);
+    const appId = appEntry ? appEntry[0] : null;
+    if (!appId) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ applications: {}, lastUpdated, appName: sess.appName, org: sess.org }));
+      return;
+    }
+    const filtered = { [appId]: cachedData[appId] };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ applications: filtered, lastUpdated, appName: sess.appName, org: sess.org }));
+    return;
+  }
+
+
   if (req.url === '/api/alarms/no-consumption') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(getNoConsumptionAlarmList()));
@@ -582,6 +657,29 @@ const server = http.createServer((req, res) => {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: false, error: e.message }));
       }
+    });
+    return;
+  }
+
+
+  // ── POST /api/portal/request-password ──
+  if (req.method === 'POST' && req.url === '/api/portal/request-password') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      try { handlePortalRequestPassword(JSON.parse(body), res); }
+      catch(e) { sendPortalJSON(res, 400, { success: false, message: 'Bad request' }); }
+    });
+    return;
+  }
+
+  // ── POST /api/portal/login ──
+  if (req.method === 'POST' && req.url === '/api/portal/login') {
+    let body = '';
+    req.on('data', d => body += d);
+    req.on('end', () => {
+      try { handlePortalLogin(JSON.parse(body), res); }
+      catch(e) { sendPortalJSON(res, 400, { success: false, message: 'Bad request' }); }
     });
     return;
   }
@@ -1071,6 +1169,7 @@ function getNoConsumptionAlarmList() {
 
 loadHistory();
 loadCustomers();
+loadPortalPasswords();
 loadAutoBillingLog();
 loadNoConsAlerts();
 server.listen(CONFIG.port, async () => {
@@ -1085,3 +1184,202 @@ server.listen(CONFIG.port, async () => {
   // Start auto-billing scheduler
   scheduleDailyAutoBilling();
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ── CUSTOMER PORTAL FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════════════
+
+function loadPortalPasswords() {
+  try {
+    if (fs.existsSync(portalPwFile))
+      portalPasswords = JSON.parse(fs.readFileSync(portalPwFile, 'utf8'));
+    console.log('[Portal] Passwords loaded:', Object.keys(portalPasswords).length);
+  } catch(e) { portalPasswords = {}; }
+}
+
+function savePortalPasswords() {
+  try { fs.writeFileSync(portalPwFile, JSON.stringify(portalPasswords, null, 2)); }
+  catch(e) { console.error('[Portal] Save error:', e.message); }
+}
+
+function sendPortalJSON(res, status, obj) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  });
+  res.end(JSON.stringify(obj));
+}
+
+async function handlePortalRequestPassword(body, res) {
+  const { email } = body;
+  if (!email) return sendPortalJSON(res, 400, { success: false, message: 'Email required' });
+
+  // Find customer by email in customers registry
+  const custKey = Object.keys(customers).find(k =>
+    (customers[k].emailAddress || '').toLowerCase().trim() === email.toLowerCase().trim()
+  );
+
+  if (!custKey) {
+    console.log('[Portal] No customer found for email:', email);
+    return sendPortalJSON(res, 404, { success: false, message: 'No account found with that email address.' });
+  }
+
+  const customer = customers[custKey];
+
+  // ── FIX: Resolve the node key that handlePortalLogin will use ──
+  // login() looks up: k = n.sn || n.name || n.devEUI from cachedData nodes.
+  // request-password must store the OTP under that SAME key, not the customers.json key.
+  const allNodes = Object.values(cachedData).flatMap(a => a.nodes || []);
+  const matchNode = allNodes.find(n => {
+    const k = (n.sn || n.name || n.devEUI || '').toLowerCase();
+    return k === custKey.toLowerCase() ||
+           k === (customer.meterTagNumber || '').toLowerCase() ||
+           (n.devEUI || '').toLowerCase() === custKey.toLowerCase() ||
+           (n.devEUI || '').toLowerCase() === (customer.meterTagNumber || '').toLowerCase();
+  });
+  // Use the node key if found; otherwise fall back to custKey
+  const storeKey = matchNode ? (matchNode.sn || matchNode.name || matchNode.devEUI) : custKey;
+
+  console.log(`[Portal] Request password: custKey=${custKey} → storeKey=${storeKey}`);
+
+  const otp = crypto.randomBytes(4).toString('hex').toUpperCase();
+  const otpExpiry = Date.now() + 24 * 60 * 60 * 1000;
+
+  const pwEntry = bcrypt
+    ? { hash: bcrypt.hashSync(otp, 10), otpExpiry }
+    : { plainOtp: otp, otpExpiry };
+
+  // Store under BOTH keys so login always finds it regardless of which key it resolves
+  portalPasswords[storeKey] = pwEntry;
+  if (storeKey !== custKey) portalPasswords[custKey] = pwEntry;
+  savePortalPasswords();
+
+  const transporter = createTransporter();
+  if (!transporter) {
+    return sendPortalJSON(res, 500, { success: false, message: 'Email service unavailable. Please contact support.' });
+  }
+
+  const devEUI = matchNode?.devEUI || '—';
+
+  try {
+    await transporter.sendMail({
+      from: CONFIG.gmail.from,
+      to: `${customer.fullName} <${email}>`,
+      subject: '🔑 Your Redlink Water Portal Password',
+      html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#06080f;color:#dde2f0;border-radius:16px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#0099cc,#00b8d4);padding:28px;text-align:center">
+          <h1 style="color:white;margin:0;font-size:24px">💧 Redlink Water</h1>
+          <p style="color:rgba(255,255,255,.85);margin:6px 0 0;font-size:14px">Customer Self-Service Portal</p>
+        </div>
+        <div style="padding:28px">
+          <p style="font-size:15px;margin:0 0 16px">Hello, <strong>${customer.fullName}</strong>!</p>
+          <p style="color:#9ba8cc;font-size:14px;margin:0 0 20px">Here is your one-time portal password. Use it to log in and view your meter details, consumption history, and bills.</p>
+          <div style="background:#0c0f1a;border:1px solid #1e2438;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
+            <div style="font-size:11px;color:#5c6585;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Your Password</div>
+            <div style="font-family:monospace;font-size:32px;font-weight:700;color:#00c8ff;letter-spacing:.15em">${otp}</div>
+            <div style="font-size:11px;color:#5c6585;margin-top:8px">Valid for 24 hours</div>
+          </div>
+          <div style="background:#111420;border:1px solid #1e2438;border-radius:10px;padding:16px;margin-bottom:20px">
+            <div style="font-size:12px;color:#9ba8cc;margin-bottom:10px;font-weight:600">YOUR METER DETAILS</div>
+            <table style="width:100%;font-size:13px;border-collapse:collapse">
+              <tr><td style="padding:5px 0;color:#5c6585;width:45%">Customer Name</td><td style="font-weight:600">${customer.fullName}</td></tr>
+              <tr><td style="padding:5px 0;color:#5c6585">Meter Tag Number</td><td style="font-family:monospace">${custKey}</td></tr>
+              <tr><td style="padding:5px 0;color:#5c6585">Device EUI</td><td style="font-family:monospace">${devEUI}</td></tr>
+              <tr><td style="padding:5px 0;color:#5c6585">Address</td><td>${customer.address || '—'}</td></tr>
+            </table>
+          </div>
+          <div style="background:#1a0c0c;border:1px solid #3d1515;border-radius:8px;padding:12px;font-size:12px;color:#ff8a93;margin-bottom:20px">
+            🔒 <strong>Security Note:</strong> Never share this password with anyone. Redlink staff will never ask for your password.
+          </div>
+          <p style="text-align:center">
+            <a href="https://watermonitoring-6l67.onrender.com/customer-portal.html" style="display:inline-block;background:linear-gradient(135deg,#00c8ff,#00b8d4);color:black;font-weight:700;padding:12px 28px;border-radius:9px;text-decoration:none;font-size:14px">
+              → Open Customer Portal
+            </a>
+          </p>
+        </div>
+        <div style="background:#0c0f1a;padding:16px;text-align:center;border-top:1px solid #1e2438">
+          <p style="color:#5c6585;font-size:12px;margin:0">Redlink Water Utility · LoRaWAN Smart Metering · Ormoc City, Leyte</p>
+        </div>
+      </div>`
+    });
+
+    console.log(`[Portal] ✅ Password sent to ${email} for meter ${storeKey} (custKey: ${custKey})`);
+    return sendPortalJSON(res, 200, { success: true, message: 'Password sent!' });
+
+  } catch(e) {
+    console.error('[Portal] ❌ Email error:', e.message);
+    return sendPortalJSON(res, 500, { success: false, message: 'Failed to send email: ' + e.message });
+  }
+}
+
+async function handlePortalLogin(body, res) {
+  const { identifier, password } = body;
+  if (!identifier || !password)
+    return sendPortalJSON(res, 400, { success: false, message: 'Identifier and password required' });
+
+  const idLow = identifier.toLowerCase().trim();
+  const allNodes = Object.values(cachedData).flatMap(a => a.nodes || []);
+
+  let matchKey = null, matchNode = null, matchCustomer = null;
+
+  // ── Pass 1: search by node SN / devEUI / customer name (via node) ──
+  for (const n of allNodes) {
+    const sn  = (n.sn || n.name || '').toLowerCase();
+    const eui = (n.devEUI || '').toLowerCase();
+    const k   = n.sn || n.name || n.devEUI;
+    const cust = customers[k] || customers[n.devEUI] || null;
+    const name = (cust?.fullName || '').toLowerCase();
+    if (sn === idLow || eui === idLow || (name && (name.includes(idLow) || idLow.includes(name)))) {
+      matchKey = k; matchNode = n; matchCustomer = cust; break;
+    }
+  }
+
+  // ── Pass 2: search directly in customers registry by meterTagNumber or name ──
+  // (handles case where node SN differs from customers.json key)
+  if (!matchKey) {
+    const custKey = Object.keys(customers).find(k =>
+      k.toLowerCase() === idLow ||
+      (customers[k].fullName || '').toLowerCase().includes(idLow) ||
+      idLow.includes((customers[k].fullName || '').toLowerCase())
+    );
+    if (custKey) {
+      matchCustomer = customers[custKey];
+      matchKey = custKey;
+      // Try to find the associated node for this customer
+      matchNode = allNodes.find(n => {
+        const k = (n.sn || n.name || n.devEUI || '').toLowerCase();
+        return k === custKey.toLowerCase() ||
+               (n.devEUI || '').toLowerCase() === custKey.toLowerCase();
+      }) || null;
+      // If node found, prefer the node's key (that's where history is stored)
+      if (matchNode) matchKey = matchNode.sn || matchNode.name || matchNode.devEUI;
+    }
+  }
+
+  if (!matchKey) return sendPortalJSON(res, 404, { success: false, message: 'No meter found matching that identifier.' });
+
+  // ── Look up stored password — check both node key AND customers key ──
+  const custMatchKey = Object.keys(customers).find(k =>
+    customers[k] === matchCustomer ||
+    k.toLowerCase() === (matchCustomer?.meterTagNumber || '').toLowerCase()
+  );
+  const stored = portalPasswords[matchKey] || (custMatchKey ? portalPasswords[custMatchKey] : null);
+
+  if (!stored) return sendPortalJSON(res, 401, { success: false, message: 'No password set. Please request a password first.' });
+  if (stored.otpExpiry && Date.now() > stored.otpExpiry) return sendPortalJSON(res, 401, { success: false, message: 'Password expired. Please request a new one.' });
+
+  let valid = false;
+  if (bcrypt && stored.hash) valid = bcrypt.compareSync(password, stored.hash);
+  else if (stored.plainOtp) valid = stored.plainOtp === password.trim().toUpperCase();
+
+  if (!valid) return sendPortalJSON(res, 401, { success: false, message: 'Incorrect password.' });
+
+  console.log(`[Portal] ✅ Login: ${matchKey} (${matchCustomer?.fullName || 'unknown'})`);
+  return sendPortalJSON(res, 200, {
+    success: true,
+    customer: matchCustomer,
+    node: matchNode,
+    history: history[matchKey] || [],
+  });
+}

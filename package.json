@@ -10,6 +10,7 @@
     "node": ">=14"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "nodemailer": "^8.0.8"
   }
 }
