@@ -1376,11 +1376,12 @@ function createTransporter() {
     console.error('[Email] Gmail App Password not set in CONFIG.gmail'); return null;
   }
   return nodemailer.createTransport({
-    host: '74.125.200.108', // smtp.gmail.com IPv4 — bypasses IPv6 DNS on Render
+    host: 'smtp.gmail.com',
     port: 587,
     secure: false,
     auth: { user: cfg.user, pass: cfg.appPassword.replace(/\s/g, '') },
-    tls: { rejectUnauthorized: false, servername: 'smtp.gmail.com' }
+    tls: { rejectUnauthorized: false },
+    dnsOptions: { family: 4 }, // force IPv4 — fixes Render IPv6 block
   });
 }
 
