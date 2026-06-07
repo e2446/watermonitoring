@@ -274,9 +274,14 @@ tbody td.right{text-align:right;font-family:var(--mono)}
           <span style="font-size:10px;color:var(--muted)">Fixed per bill</span>
         </div>
         <div class="rate-item">
-          <label class="rate-label">🏦 VAT (%)</label>
-          <input type="number" class="rate-input" id="rate-vat" value="12" min="0" max="100" step="0.5">
-          <span style="font-size:10px;color:var(--muted)">Applied to subtotal</span>
+          <label class="rate-label">🎖 SC/PWD Discount (%)</label>
+          <input type="number" class="rate-input" id="rate-scpwd" value="5" min="0" max="100" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">Senior/PWD discount on Total Sales</span>
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">🏦 Withholding Tax (%)</label>
+          <input type="number" class="rate-input" id="rate-withholding" value="0" min="0" max="100" step="0.5">
+          <span style="font-size:10px;color:var(--muted)">Deducted from Total Due</span>
         </div>
         <div class="rate-item">
           <label class="rate-label">🏢 Utility Name</label>
@@ -285,6 +290,11 @@ tbody td.right{text-align:right;font-family:var(--mono)}
         <div class="rate-item">
           <label class="rate-label">📍 Address</label>
           <input type="text" class="rate-input" id="rate-address" value="Ormoc City, Leyte" style="font-family:var(--sans)">
+        </div>
+        <div class="rate-item">
+          <label class="rate-label">🧾 NON-VAT Reg. TIN</label>
+          <input type="text" class="rate-input" id="rate-tin" value="" placeholder="000-000-000-00000" style="font-family:var(--mono);font-size:12px">
+          <span style="font-size:10px;color:var(--muted)">Leave blank if not applicable</span>
         </div>
       </div>
     </div>
@@ -477,37 +487,59 @@ async function loadData() {
 // ── BILLING CALCULATION ──
 function getRates() {
   return {
-    minCharge:    parseFloat(document.getElementById('rate-min-charge').value) || 120,
-    minCubic:     parseFloat(document.getElementById('rate-min-cubic').value)  || 10,
-    perCubic:     parseFloat(document.getElementById('rate-per-cubic').value)  || 15,
-    envFee:       parseFloat(document.getElementById('rate-env').value)        || 5,
-    sysCharge:    parseFloat(document.getElementById('rate-sys').value)        || 10,
-    vatPct:       parseFloat(document.getElementById('rate-vat').value)        || 12,
-    utilityName:  document.getElementById('rate-utility').value  || 'Redlink Water Utility',
-    address:      document.getElementById('rate-address').value  || 'Ormoc City, Leyte',
+    minCharge:       parseFloat(document.getElementById('rate-min-charge').value)   || 120,
+    minCubic:        parseFloat(document.getElementById('rate-min-cubic').value)    || 10,
+    perCubic:        parseFloat(document.getElementById('rate-per-cubic').value)    || 15,
+    envFee:          parseFloat(document.getElementById('rate-env').value)          || 5,
+    sysCharge:       parseFloat(document.getElementById('rate-sys').value)          || 10,
+    scpwdPct:        parseFloat(document.getElementById('rate-scpwd').value)        || 0,
+    withholdingPct:  parseFloat(document.getElementById('rate-withholding').value)  || 0,
+    utilityName:     document.getElementById('rate-utility').value  || 'Redlink Water Utility',
+    address:         document.getElementById('rate-address').value  || 'Ormoc City, Leyte',
+    tin:             document.getElementById('rate-tin').value      || '',
   };
 }
 
 function calcBill(consumed, rates) {
   const c = Math.max(0, consumed);
 
-  // Zero consumption = zero bill (no water used, no charge)
+  // Zero consumption = zero bill
   if(c === 0) {
-    return { waterCharge: 0, envFee: 0, sysCharge: 0, subtotal: 0, vat: 0, total: 0, isZero: true };
+    return { waterCharge:0, envFee:0, sysCharge:0, totalSales:0, scpwdDiscount:0, lessRebates:0, totalDue:0, lessWithholding:0, totalAmountDue:0, isZero:true };
   }
 
-  // Water charge: minimum charge covers first minCubic m³
-  // If consumed <= minCubic: pay minimum charge
-  // If consumed > minCubic: pay minimum charge + excess × rate per m³
+  // Water charge (same block-rate logic)
   let waterCharge = rates.minCharge;
   if(c > rates.minCubic) {
     waterCharge += (c - rates.minCubic) * rates.perCubic;
   }
 
-  const subtotal = waterCharge + rates.envFee + rates.sysCharge;
-  const vat      = subtotal * (rates.vatPct / 100);
-  const total    = subtotal + vat;
-  return { waterCharge, envFee: rates.envFee, sysCharge: rates.sysCharge, subtotal, vat, total, isZero: false };
+  // Total Sales = water + env + sys (NON-VAT, like Carcar WD)
+  const totalSales = waterCharge + rates.envFee + rates.sysCharge;
+
+  // SC/PWD Discount (on Total Sales)
+  const scpwdDiscount = totalSales * (rates.scpwdPct / 100);
+
+  // Less: Rebates — same as Total Sales for NON-VAT (net taxable = 0)
+  const lessRebates = totalSales;
+
+  // Total Due = Total Sales - SC/PWD Discount
+  const totalDue = totalSales - scpwdDiscount;
+
+  // Less: Withholding Tax
+  const lessWithholding = totalDue * (rates.withholdingPct / 100);
+
+  // Total Amount Due
+  const totalAmountDue = totalDue - lessWithholding;
+
+  return {
+    waterCharge, envFee: rates.envFee, sysCharge: rates.sysCharge,
+    totalSales, scpwdDiscount, lessRebates,
+    totalDue, lessWithholding, totalAmountDue,
+    // keep .total alias for backward compat with summary stats
+    total: totalAmountDue,
+    isZero: false
+  };
 }
 
 function getMonthConsumption(meterKey, year, month) {
@@ -610,9 +642,11 @@ function generateBills() {
                 <th class="right">Curr Reading</th>
                 <th class="right">Consumed (m³)</th>
                 <th class="right">Water Charge</th>
-                <th class="right">Fees</th>
-                <th class="right">VAT (${rates.vatPct}%)</th>
-                <th class="right">TOTAL DUE</th>
+                <th class="right">Total Sales</th>
+                <th class="right">SC/PWD Disc.</th>
+                <th class="right">Total Due</th>
+                <th class="right">W/holding</th>
+                <th class="right">TOTAL AMT DUE</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -646,11 +680,13 @@ function generateBills() {
                     <td class="right">${m.cons.endReading.toFixed(3)}</td>
                     <td class="right" style="color:${isZero?'var(--muted)':m.cons.consumed>0?'var(--amber)':'var(--muted)'};font-weight:700">${m.cons.consumed.toFixed(3)}</td>
                     <td class="right">${isZero?'<span style="color:var(--muted)">—</span>':'₱'+m.bill.waterCharge.toFixed(2)}</td>
-                    <td class="right" style="color:var(--muted)">${isZero?'—':'₱'+(m.bill.envFee+m.bill.sysCharge).toFixed(2)}</td>
-                    <td class="right" style="color:var(--muted)">${isZero?'—':'₱'+m.bill.vat.toFixed(2)}</td>
+                    <td class="right" style="color:var(--muted)">${isZero?'—':'₱'+m.bill.totalSales.toFixed(2)}</td>
+                    <td class="right" style="color:var(--amber)">${isZero?'—':m.bill.scpwdDiscount>0?'-₱'+m.bill.scpwdDiscount.toFixed(2):'—'}</td>
+                    <td class="right" style="color:var(--muted)">${isZero?'—':'₱'+m.bill.totalDue.toFixed(2)}</td>
+                    <td class="right" style="color:var(--muted)">${isZero?'—':m.bill.lessWithholding>0?'-₱'+m.bill.lessWithholding.toFixed(2):'—'}</td>
                     <td class="right">${isZero
                       ? '<span style="color:var(--muted);font-size:12px">₱0.00 — No usage</span>'
-                      : '<span class="amount total">₱'+m.bill.total.toFixed(2)+'</span>'}</td>
+                      : '<span class="amount total">₱'+m.bill.totalAmountDue.toFixed(2)+'</span>'}</td>
                     <td>${isZero
                       ? '<span style="color:var(--muted);font-size:11px">No bill</span>'
                       : `<div style="display:flex;flex-direction:column;gap:5px">
@@ -682,122 +718,170 @@ function buildBillHTML(m, rates) {
   const dueFormatted = m.dueDate ? new Date(m.dueDate).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'}) : '—';
   const startFmt = m.cons.startDate ? m.cons.startDate.replace('T',' ').replace('+08:00','').substring(0,16) : '—';
   const endFmt   = m.cons.endDate   ? m.cons.endDate.replace('T',' ').replace('+08:00','').substring(0,16)   : '—';
-  const isMin    = m.cons.consumed <= rates.minCubic;
+  const tinLine  = rates.tin ? `NON-VAT REG. TIN: ${rates.tin}` : 'NON-VAT';
   return `
   <div class="bill">
-    <div class="bill-header">
+    <!-- HEADER: Carcar WD style -->
+    <div style="text-align:center;margin-bottom:14px;padding-bottom:14px;border-bottom:2px solid #0d7abf">
+      <div style="font-size:11px;color:#555">Republic of the Philippines</div>
+      <div style="font-size:13px;font-weight:700;color:#0d7abf">${rates.utilityName.toUpperCase()}</div>
+      <div style="font-size:11px;color:#555">${rates.address}</div>
+      ${rates.tin ? `<div style="font-size:10px;color:#888;margin-top:2px">NON-VAT REG. TIN: ${rates.tin}</div>` : ''}
+    </div>
+
+    <!-- INVOICE TITLE ROW -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div>
-        <div class="bill-logo">💧 ${rates.utilityName}</div>
-        <div class="bill-logo-sub">${rates.address}</div>
-        <div class="bill-logo-sub" style="margin-top:4px;color:#0d7abf">Water Statement of Account</div>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:#c00;letter-spacing:1px">Service </span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:#111;letter-spacing:1px;font-weight:900">INVOICE</span>
       </div>
-      <div class="bill-title">
-        <h2>WATER BILL</h2>
-        <div class="bill-no">Bill No: ${m.billNo}</div>
-        <div class="bill-no">Period: ${m.period}</div>
+      <div style="text-align:right">
+        <div style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700">${m.billNo}</div>
+        <div style="font-size:12px;color:#555">Date: ${m.dueDate ? new Date(m.dueDate).toLocaleDateString('en-PH') : '—'}</div>
       </div>
     </div>
 
-    <div class="bill-meta">
-      <div class="bill-meta-box">
-        <h4>Account Information</h4>
-        ${customer ? `
-        <div class="bill-meta-row"><span class="label">Customer Name</span><span class="value" style="font-family:'DM Sans';font-size:13px">${customer.fullName}</span></div>
-        <div class="bill-meta-row"><span class="label">Address</span><span class="value" style="font-family:'DM Sans';font-size:11px">${customer.address}</span></div>
-        <div class="bill-meta-row"><span class="label">Contact</span><span class="value" style="font-family:'DM Sans'">${customer.contactNumber}</span></div>
-        <div class="bill-meta-row"><span class="label">Email</span><span class="value" style="font-family:'DM Sans';font-size:11px">${customer.emailAddress}</span></div>
-        <div style="border-top:1px solid #eee;margin:8px 0"></div>` : `
-        <div style="background:#fff3cd;border-radius:4px;padding:6px 10px;font-size:11px;color:#7a5c00;margin-bottom:8px">⚠️ No customer registered for this meter</div>`}
-        <div class="bill-meta-row"><span class="label">Serial Number</span><span class="value">${m.key}</span></div>
-        <div class="bill-meta-row"><span class="label">Device EUI</span><span class="value" style="font-size:10px">${m.n.devEUI||'—'}</span></div>
-        <div class="bill-meta-row"><span class="label">Application</span><span class="value" style="font-family:'DM Sans'">${m.appName}</span></div>
-        <div class="bill-meta-row"><span class="label">Meter Type</span><span class="value" style="font-family:'DM Sans'">LoRaWAN Water Meter</span></div>
+    <!-- CUSTOMER INFO -->
+    <div style="border:1px solid #ccc;border-radius:6px;padding:12px 14px;margin-bottom:16px;font-size:13px">
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Customer Acct. No.</div>
+          <div style="font-family:'Space Mono',monospace;font-weight:700">${m.key.slice(-8)}</div>
+        </div>
+        <div style="flex:2;min-width:200px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Customer Name</div>
+          <div style="font-weight:700">${customer ? customer.fullName : '⚠️ Not Registered'}</div>
+        </div>
       </div>
-      <div class="bill-meta-box">
-        <h4>Billing Details</h4>
-        <div class="bill-meta-row"><span class="label">Billing Period</span><span class="value" style="font-family:'DM Sans'">${m.period}</span></div>
-        <div class="bill-meta-row"><span class="label">Reading Date</span><span class="value" style="font-size:10px">${endFmt}</span></div>
-        <div class="bill-meta-row"><span class="label">Due Date</span><span class="value" style="color:#e53e3e;font-family:'DM Sans'">${dueFormatted}</span></div>
-        <div class="bill-meta-row"><span class="label">Data Points</span><span class="value">${m.cons.records} readings</span></div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px">
+        <div style="flex:2;min-width:200px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Customer Address</div>
+          <div>${customer ? customer.address : '—'}</div>
+        </div>
+        <div style="flex:1;min-width:160px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Contact</div>
+          <div>${customer ? customer.contactNumber : '—'}</div>
+        </div>
+        <div style="flex:1;min-width:160px">
+          <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Meter Serial / Device EUI</div>
+          <div style="font-family:'Space Mono',monospace;font-size:11px">${m.key}</div>
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:#888">${m.n && m.n.devEUI ? m.n.devEUI : ''}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <div style="color:#888;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Billing Period</div>
+        <div style="font-weight:600">${m.period} &nbsp;·&nbsp; Reading: ${endFmt} &nbsp;·&nbsp; Due: <span style="color:#c00;font-weight:700">${dueFormatted}</span></div>
+      </div>
+      ${!customer ? `<div style="background:#fff3cd;border-radius:4px;padding:5px 10px;font-size:11px;color:#7a5c00;margin-top:8px">⚠️ No customer registered for this meter</div>` : ''}
+    </div>
+
+    <!-- TWO-COLUMN INVOICE BODY (matches Carcar WD layout) -->
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+
+      <!-- LEFT: IN PAYMENT OF / SERVICES -->
+      <div style="flex:1;border:1px solid #ccc;border-radius:6px;padding:12px 14px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#555;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:6px">In Payment Of / Services</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr>
+            <td style="padding:5px 0;color:#333">Water Fee</td>
+            <td style="padding:5px 0;text-align:right;font-family:'Space Mono',monospace;font-weight:700">₱${m.bill.waterCharge.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:#555;font-size:12px;padding-left:10px">Environmental Fee</td>
+            <td style="padding:5px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">₱${m.bill.envFee.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 0;color:#555;font-size:12px;padding-left:10px">System/Service Charge</td>
+            <td style="padding:5px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">₱${m.bill.sysCharge.toFixed(2)}</td>
+          </tr>
+          ${excess > 0 ? `
+          <tr>
+            <td style="padding:5px 0;color:#555;font-size:11px;padding-left:10px" colspan="2">
+              <span style="color:#888">Minimum: ₱${rates.minCharge.toFixed(2)} (${rates.minCubic} m³)<br>
+              Excess: ${excess.toFixed(3)} m³ × ₱${rates.perCubic.toFixed(2)}/m³ = ₱${(excess*rates.perCubic).toFixed(2)}</span>
+            </td>
+          </tr>` : `
+          <tr>
+            <td style="padding:5px 0;color:#888;font-size:11px;padding-left:10px" colspan="2">
+              Minimum charge (≤${rates.minCubic} m³): ₱${rates.minCharge.toFixed(2)}
+            </td>
+          </tr>`}
+          <tr style="border-top:1px solid #eee">
+            <td style="padding:8px 0;color:#888;font-size:11px">Consumption: <strong style="color:#333">${m.cons.consumed.toFixed(3)} m³</strong></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="padding:3px 0;color:#888;font-size:10px">Prev: ${m.cons.startReading.toFixed(3)} m³ (${startFmt})</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td style="padding:3px 0;color:#888;font-size:10px">Curr: ${m.cons.endReading.toFixed(3)} m³ (${endFmt})</td>
+            <td></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- RIGHT: TOTALS (Carcar WD style) -->
+      <div style="flex:1;border:1px solid #ccc;border-radius:6px;padding:12px 14px">
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr>
+            <td style="padding:6px 0;color:#333">TOTAL SALES</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-weight:700">₱${m.bill.totalSales.toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:1px solid #eee">
+            <td style="padding:6px 0;color:#555;font-size:12px">Less: Disc. (SC/SP/NAAC/MOV/PWD)</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">${m.bill.scpwdDiscount > 0 ? m.bill.scpwdDiscount.toFixed(2) : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#555;font-size:12px">Less: Rebates</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">${m.bill.lessRebates.toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:2px solid #333">
+            <td style="padding:6px 0;font-weight:700;color:#111">TOTAL DUE</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-weight:700"></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#555;font-size:12px">Less: Withholding</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">${m.bill.lessWithholding > 0 ? m.bill.lessWithholding.toFixed(2) : '—'}</td>
+          </tr>
+          <tr style="background:#0d7abf;border-radius:4px">
+            <td style="padding:8px 6px;font-weight:700;font-size:14px;color:#fff">TOTAL AMOUNT DUE &nbsp;₱</td>
+            <td style="padding:8px 6px;text-align:right;font-family:'Space Mono',monospace;font-weight:900;font-size:16px;color:#fff">${m.bill.totalAmountDue.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#555;font-size:12px">Amount Received</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px;border-bottom:1px solid #eee">___________</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#555;font-size:12px">Sales Subject to Pt / Exempt Sales</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">${m.bill.totalSales.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#555;font-size:12px">Change</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">___________</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#555;font-size:12px">Balance</td>
+            <td style="padding:6px 0;text-align:right;font-family:'Space Mono',monospace;font-size:12px">___________</td>
+          </tr>
+        </table>
       </div>
     </div>
 
-    ${isMin?`<div class="block-tier">ℹ️ Consumption of ${m.cons.consumed.toFixed(3)} m³ is within the minimum block (${rates.minCubic} m³). Minimum charge of ₱${rates.minCharge.toFixed(2)} applies.</div>`:''}
-
-    <table class="bill-table">
-      <thead>
-        <tr>
-          <th>Description</th>
-          <th>Details</th>
-          <th class="r">Amount (₱)</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Previous Reading</strong></td>
-          <td>${startFmt}</td>
-          <td class="r">${m.cons.startReading.toFixed(3)} m³</td>
-        </tr>
-        <tr>
-          <td><strong>Current Reading</strong></td>
-          <td>${endFmt}</td>
-          <td class="r">${m.cons.endReading.toFixed(3)} m³</td>
-        </tr>
-        <tr style="background:#f0f9ff">
-          <td><strong>Total Consumption</strong></td>
-          <td>${m.cons.consumed.toFixed(3)} m³</td>
-          <td class="r"><strong>${m.cons.consumed.toFixed(3)} m³</strong></td>
-        </tr>
-        <tr><td colspan="3" style="padding:6px"></td></tr>
-        <tr>
-          <td>Minimum Charge (first ${rates.minCubic} m³)</td>
-          <td>${Math.min(m.cons.consumed, rates.minCubic).toFixed(3)} m³ × minimum</td>
-          <td class="r">₱${rates.minCharge.toFixed(2)}</td>
-        </tr>
-        ${excess > 0 ? `<tr>
-          <td>Excess Consumption</td>
-          <td>${excess.toFixed(3)} m³ × ₱${rates.perCubic.toFixed(2)}/m³</td>
-          <td class="r">₱${(excess * rates.perCubic).toFixed(2)}</td>
-        </tr>` : ''}
-        <tr>
-          <td>Environmental Fee</td>
-          <td>Fixed charge</td>
-          <td class="r">₱${rates.envFee.toFixed(2)}</td>
-        </tr>
-        <tr>
-          <td>System/Service Charge</td>
-          <td>Fixed charge</td>
-          <td class="r">₱${rates.sysCharge.toFixed(2)}</td>
-        </tr>
-        <tr class="subtotal">
-          <td colspan="2"><strong>Subtotal</strong></td>
-          <td class="r"><strong>₱${m.bill.subtotal.toFixed(2)}</strong></td>
-        </tr>
-        <tr>
-          <td>VAT (${rates.vatPct}%)</td>
-          <td>${rates.vatPct}% of subtotal</td>
-          <td class="r">₱${m.bill.vat.toFixed(2)}</td>
-        </tr>
-        <tr class="total-row">
-          <td colspan="2"><strong>TOTAL AMOUNT DUE</strong></td>
-          <td class="r"><strong>₱${m.bill.total.toFixed(2)}</strong></td>
-        </tr>
-      </tbody>
-    </table>
-
+    <!-- FOOTER -->
     <div class="bill-footer">
       <div class="bill-note">
         Please pay on or before <strong>${dueFormatted}</strong>.<br>
         Late payment may result in disconnection.<br>
-        For inquiries, contact your water utility office.<br>
-        <br>
+        For inquiries, contact your water utility office.<br><br>
         This bill is system-generated via LoRaWAN smart metering.
       </div>
       <div class="bill-sig">
         <div class="bill-stamp">UNPAID</div>
         <div class="bill-sig-line"></div>
-        <div class="bill-sig-label">Authorized Signature</div>
-        <div class="bill-sig-label" style="margin-top:2px;font-weight:600">${rates.utilityName}</div>
+        <div style="font-size:11px;color:#888">Issued by / Authorized Signature</div>
+        <div style="font-size:12px;font-weight:600;margin-top:2px">${rates.utilityName}</div>
+        <div style="font-size:10px;color:#aaa;margin-top:4px">THIS DOCUMENT IS NOT VALID FOR CLAIMING INPUT TAXES.</div>
       </div>
     </div>
   </div>`;
@@ -930,6 +1014,8 @@ async function _doSendEmail(m, btnEl) {
       consumed:     m.cons.consumed,
       startReading: m.cons.startReading,
       endReading:   m.cons.endReading,
+      startDate:    m.cons.startDate,
+      endDate:      m.cons.endDate,
     },
     rates,
     period:  m.period,
