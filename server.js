@@ -1376,7 +1376,10 @@ function createTransporter() {
     console.error('[Email] Gmail App Password not set in CONFIG.gmail'); return null;
   }
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    family: 4, // force IPv4 — Render free tier blocks IPv6 SMTP
     auth: { user: cfg.user, pass: cfg.appPassword.replace(/\s/g, '') }
   });
 }
@@ -1434,7 +1437,7 @@ function saveNoConsAlerts() {
 
 async function checkNoConsumptionAlarms(allNodes) {
   const now = Date.now();
-  const transporter = getTransporter();
+  const transporter = createTransporter();
   if (!transporter) return;
 
   for (const n of allNodes) {
