@@ -187,9 +187,27 @@ tbody td{padding:10px 12px;vertical-align:middle}
 .app-section-title{display:flex;align-items:center;gap:8px}
 
 /* PERIOD BAR */
-.period-bar{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.period-bar{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
 .pbtn{padding:7px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--muted);transition:all .15s;font-family:var(--sans)}
 .pbtn:hover{color:var(--text)}.pbtn.active{background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.3);color:var(--accent)}
+.pbtn.custom-active{background:rgba(179,136,255,.1);border-color:rgba(179,136,255,.4);color:var(--purple)}
+
+/* CUSTOM DATE PICKER PANEL */
+.custom-range-panel{display:none;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;margin-bottom:16px;animation:fadeIn .2s ease both}
+.custom-range-panel.open{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px}
+.crp-group{display:flex;flex-direction:column;gap:5px}
+.crp-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.crp-input{padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--bg3);color:var(--text);font-size:12px;font-family:var(--mono);outline:none;transition:border-color .15s;min-width:160px}
+.crp-input:focus{border-color:rgba(179,136,255,.5)}
+.crp-input::-webkit-calendar-picker-indicator{filter:invert(.6) sepia(1) saturate(3) hue-rotate(220deg)}
+.crp-apply{padding:7px 20px;background:rgba(179,136,255,.15);border:1px solid rgba(179,136,255,.4);color:var(--purple);border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.crp-apply:hover{background:rgba(179,136,255,.25)}
+.crp-clear{padding:7px 14px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.crp-clear:hover{color:var(--text);border-color:var(--border2)}
+.crp-badge{font-size:11px;color:var(--purple);background:rgba(179,136,255,.1);border:1px solid rgba(179,136,255,.25);border-radius:99px;padding:3px 10px;font-family:var(--mono);white-space:nowrap}
+.crp-shortcut-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
+.crp-shortcut{padding:3px 10px;border-radius:5px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--muted);font-family:var(--sans);transition:all .15s}
+.crp-shortcut:hover{color:var(--text);border-color:var(--border2)}
 
 /* CONSUMPTION SUMMARY */
 .cons-summary-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:18px;overflow:hidden}
@@ -393,12 +411,40 @@ tbody td{padding:10px 12px;vertical-align:middle}
 
       <!-- Period selector -->
       <div class="period-bar">
-        <button class="pbtn active" onclick="setHistPeriod('today',this)">Today</button>
-        <button class="pbtn" onclick="setHistPeriod('yesterday',this)">Yesterday</button>
-        <button class="pbtn" onclick="setHistPeriod('week',this)">This Week</button>
-        <button class="pbtn" onclick="setHistPeriod('lastweek',this)">Last Week</button>
-        <button class="pbtn" onclick="setHistPeriod('month',this)">This Month</button>
-        <button class="pbtn" onclick="setHistPeriod('all',this)">All Time</button>
+        <button class="pbtn active" id="pbtn-today"     onclick="setHistPeriod('today',this)">Today</button>
+        <button class="pbtn" id="pbtn-yesterday"        onclick="setHistPeriod('yesterday',this)">Yesterday</button>
+        <button class="pbtn" id="pbtn-week"             onclick="setHistPeriod('week',this)">This Week</button>
+        <button class="pbtn" id="pbtn-lastweek"         onclick="setHistPeriod('lastweek',this)">Last Week</button>
+        <button class="pbtn" id="pbtn-month"            onclick="setHistPeriod('month',this)">This Month</button>
+        <button class="pbtn" id="pbtn-all"              onclick="setHistPeriod('all',this)">All Time</button>
+        <button class="pbtn" id="pbtn-custom"           onclick="toggleCustomRange(this)">&#128197; Custom Range</button>
+        <span id="crp-active-badge" class="crp-badge" style="display:none"></span>
+      </div>
+
+      <!-- Custom date/time range panel -->
+      <div class="custom-range-panel" id="custom-range-panel">
+        <div class="crp-group">
+          <div class="crp-label">From &mdash; Date &amp; Time (PHT)</div>
+          <input class="crp-input" type="datetime-local" id="crp-start" step="60">
+          <div class="crp-shortcut-row">
+            <button class="crp-shortcut" onclick="crpShortcut('start','00:00')">Start of day</button>
+            <button class="crp-shortcut" onclick="crpShortcut('start','06:00')">06:00</button>
+            <button class="crp-shortcut" onclick="crpShortcut('start','12:00')">12:00</button>
+          </div>
+        </div>
+        <div class="crp-group">
+          <div class="crp-label">To &mdash; Date &amp; Time (PHT)</div>
+          <input class="crp-input" type="datetime-local" id="crp-end" step="60">
+          <div class="crp-shortcut-row">
+            <button class="crp-shortcut" onclick="crpShortcut('end','12:00')">12:00</button>
+            <button class="crp-shortcut" onclick="crpShortcut('end','18:00')">18:00</button>
+            <button class="crp-shortcut" onclick="crpShortcut('end','23:59')">End of day</button>
+          </div>
+        </div>
+        <div class="crp-group" style="gap:8px">
+          <button class="crp-apply" onclick="applyCustomRange()">Apply Range</button>
+          <button class="crp-clear" onclick="clearCustomRange()">&#x2715; Clear</button>
+        </div>
       </div>
 
       <!-- Summary strip -->
@@ -524,9 +570,13 @@ tbody td{padding:10px 12px;vertical-align:middle}
       </div>
     </div>
     <div class="modal-body">
-      <div class="chart-tabs">
-        <button class="ctab active" onclick="setChartType('line',this)">📈 Line</button>
-        <button class="ctab" onclick="setChartType('bar',this)">📊 Bar</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div class="chart-tabs" style="margin-bottom:0">
+          <button class="ctab active" onclick="setChartType('line',this)">📈 Line</button>
+          <button class="ctab" onclick="setChartType('bar',this)">📊 Bar</button>
+        </div>
+        <div id="modal-range-badge" style="display:none;font-size:11px;color:var(--purple);background:rgba(179,136,255,.1);border:1px solid rgba(179,136,255,.25);border-radius:99px;padding:3px 12px;font-family:var(--mono)"></div>
+        <div id="modal-alldata-badge" style="display:none;font-size:11px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);border-radius:99px;padding:3px 12px">Showing: All recorded data</div>
       </div>
       <div class="chart-wrap"><canvas id="hist-chart"></canvas></div>
       <div class="section-hdr" style="margin-top:12px">
@@ -560,6 +610,7 @@ function doLogout() {
 
 // ── STATE ──
 let appData = {}, historyData = {}, customersData = {};
+let baseHistoryData = {}; // always holds the current-month data from /api/history
 let activeApp = null, currentView = 'card', currentFilter = 'all';
 let cdSecs = 60, cdTimer;
 let modalMeterKey = null, modalChartType = 'line', modalChartInst = null;
@@ -617,6 +668,7 @@ async function fetchData() {
     if(!nodesRes.ok) throw new Error();
     appData = (await nodesRes.json()).applications || {};
     historyData = await histRes.json();
+    baseHistoryData = historyData; // keep a copy of current-month data
     try { customersData = await custRes.json(); } catch(e) { customersData = {}; }
     document.getElementById('ebar').style.display = 'none';
     document.getElementById('conn-status').textContent = 'Connected';
@@ -1163,9 +1215,124 @@ async function sendAllProblemAlerts() {
 
 // ── HISTORY PAGE ──
 let histPeriod = 'today';
-const periodLabels = {today:'Today',yesterday:'Yesterday',week:'This Week',lastweek:'Last Week',month:'This Month',all:'All Time'};
+let customRangeStart = null;
+let customRangeEnd   = null;
+let isCustomRange    = false;
+const periodLabels = {today:'Today',yesterday:'Yesterday',week:'This Week',lastweek:'Last Week',month:'This Month',all:'All Time',custom:'Custom Range Total Consumption'};
+
+// ── CUSTOM DATE RANGE ──
+function toggleCustomRange(btn) {
+  const panel = document.getElementById('custom-range-panel');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('custom-active');
+  } else {
+    panel.classList.add('open');
+    btn.classList.add('custom-active');
+    // Pre-fill with today if empty
+    const pht = getPHTNow();
+    const pad = n => String(n).padStart(2,'0');
+    const todayStr = `${pht.getFullYear()}-${pad(pht.getMonth()+1)}-${pad(pht.getDate())}`;
+    if (!document.getElementById('crp-start').value)
+      document.getElementById('crp-start').value = todayStr + 'T00:00';
+    if (!document.getElementById('crp-end').value)
+      document.getElementById('crp-end').value = todayStr + 'T23:59';
+  }
+}
+
+function crpShortcut(field, time) {
+  const el = document.getElementById('crp-' + field);
+  if (!el.value) {
+    const pht = getPHTNow();
+    const pad = n => String(n).padStart(2,'0');
+    el.value = `${pht.getFullYear()}-${pad(pht.getMonth()+1)}-${pad(pht.getDate())}T${time}`;
+  } else {
+    el.value = el.value.substring(0, 11) + time;
+  }
+}
+
+async function applyCustomRange() {
+  const startVal = document.getElementById('crp-start').value;
+  const endVal   = document.getElementById('crp-end').value;
+  if (!startVal || !endVal) { alert('Please select both a start and end date/time.'); return; }
+  customRangeStart = new Date(startVal);
+  customRangeEnd   = new Date(endVal);
+  if (customRangeStart >= customRangeEnd) { alert('Start must be before end.'); return; }
+  isCustomRange = true;
+  histPeriod = 'custom';
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pbtn-custom').classList.add('custom-active');
+  // Show badge
+  const pad = n => String(n).padStart(2,'0');
+  const fmtDT = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const badge = document.getElementById('crp-active-badge');
+  badge.textContent = fmtDT(customRangeStart) + ' → ' + fmtDT(customRangeEnd);
+  badge.style.display = '';
+  document.getElementById('custom-range-panel').classList.remove('open');
+
+  // ── Fetch archive data for the selected range ──
+  // Build ISO strings with PHT (+08:00) offset so the server filters correctly
+  function toISOWithPHT(d) {
+    const pad2 = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}:00+08:00`;
+  }
+  const fromISO = toISOWithPHT(customRangeStart);
+  const toISO   = toISOWithPHT(customRangeEnd);
+
+  try {
+    const res = await fetch(`/api/history/range?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`,
+      { headers: { 'x-mgmt-token': mgmtToken } });
+    if (res.ok) {
+      const rangeData = await res.json();
+      // Merge: start from current-month base, then overlay rangeData
+      // rangeData includes archived + current snaps filtered to range + baseline
+      historyData = {};
+      // Collect all known meter keys from both sources
+      const allKeys = new Set([...Object.keys(baseHistoryData), ...Object.keys(rangeData)]);
+      for (const key of allKeys) {
+        const base  = baseHistoryData[key] || [];
+        const range = rangeData[key] || [];
+        // Merge dedup by ts
+        const seen = new Set();
+        const merged = [];
+        for (const s of [...range, ...base]) {
+          if (!seen.has(s.ts)) { seen.add(s.ts); merged.push(s); }
+        }
+        merged.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+        historyData[key] = merged;
+      }
+    }
+  } catch(e) {
+    console.warn('[CustomRange] Could not fetch archive data:', e.message);
+    // Fall back to current historyData (current month only)
+  }
+
+  renderHistoryPage();
+}
+
+function clearCustomRange() {
+  isCustomRange = false;
+  customRangeStart = null;
+  customRangeEnd   = null;
+  historyData = baseHistoryData; // restore current-month data
+  document.getElementById('crp-active-badge').style.display = 'none';
+  document.getElementById('pbtn-custom').classList.remove('custom-active');
+  document.getElementById('custom-range-panel').classList.remove('open');
+  // Fall back to today
+  histPeriod = 'today';
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pbtn-today').classList.add('active');
+  renderHistoryPage();
+}
 
 function setHistPeriod(p, btn) {
+  // Close custom panel & clear custom state when a preset is picked
+  isCustomRange = false;
+  historyData = baseHistoryData; // restore current-month data
+  document.getElementById('custom-range-panel').classList.remove('open');
+  document.getElementById('pbtn-custom').classList.remove('custom-active');
+  document.getElementById('crp-active-badge').style.display = 'none';
   histPeriod = p;
   document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
@@ -1206,6 +1373,12 @@ function getPeriodRange(period) {
       start = new Date(y, m, 1, 0, 0, 0);
       end   = new Date(y, m+1, 0, 23, 59, 59);
       break;
+    case 'custom':
+      // Use the user-selected PHT local datetimes directly
+      // datetime-local gives local browser time; we treat those values as PHT
+      start = customRangeStart || new Date(2000, 0, 1);
+      end   = customRangeEnd   || new Date(2099, 0, 1);
+      break;
     default: // all
       start = new Date(2000, 0, 1);
       end   = new Date(2099, 0, 1);
@@ -1237,8 +1410,10 @@ function renderHistoryPage() {
   const { start, end } = getPeriodRange(histPeriod);
   const pad = n=>String(n).padStart(2,'0');
   const fmtD = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const fmtDT = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   document.getElementById('hist-period-range').textContent =
-    histPeriod==='all' ? 'All recorded data' :
+    histPeriod==='all'    ? 'All recorded data' :
+    histPeriod==='custom' ? `${fmtDT(start)} → ${fmtDT(end)}` :
     histPeriod==='today'||histPeriod==='yesterday' ? fmtD(start) :
     `${fmtD(start)} → ${fmtD(end)}`;
 
@@ -1314,10 +1489,14 @@ function renderHistoryPage() {
           const cons = getConsumptionForPeriod(key, histPeriod);
           const encKey = encodeURIComponent(key);
           const consColor = cons&&parseFloat(cons.consumed)>0?'var(--accent)':cons&&parseFloat(cons.consumed)<0?'var(--red)':'var(--muted)';
+          // Show filtered record count on the card
+          const { filtered: cardFiltered, isFiltered: cardIsFiltered } = getFilteredHistForModal(hist);
+          const cardRecCount = cardIsFiltered ? cardFiltered.length : hist.length;
+          const cardRecLabel = cardIsFiltered ? `${cardRecCount} in range` : `${cardRecCount} records`;
           return `<div class="meter-card" onclick="openModal('${encKey}','${key.replace(/'/g,'')}','${(n.devEUI||'').replace(/'/g,'')}')">
             <div class="meter-head">
               <div class="meter-sn"><span>SN: </span>${n.sn||n.name||'—'}</div>
-              <span class="section-badge">${hist.length} records</span>
+              <span class="section-badge">${cardRecLabel}</span>
             </div>
             <div class="meter-eui">${n.devEUI||'—'}</div>
             <div class="meter-reading-block">
@@ -1382,24 +1561,86 @@ function renderDownloadList() {
   }).join('');
 }
 
+// ── MODAL HISTORY FILTER ──
+// Returns the slice of hist relevant to the active period/custom range,
+// plus one "baseline" record just before the window for consumption calc.
+function getFilteredHistForModal(hist) {
+  if (!hist.length) return { filtered: [], baseline: null, isFiltered: false };
+
+  // If no custom range AND period is 'all', return everything unfiltered
+  if (!isCustomRange && histPeriod === 'all') {
+    return { filtered: hist, baseline: null, isFiltered: false };
+  }
+
+  const { start, end } = getPeriodRange(histPeriod);
+
+  // Records strictly inside the window
+  const inWindow = hist.filter(h => {
+    const t = new Date(h.ts);
+    return t >= start && t <= end;
+  });
+
+  // The record immediately before the window (baseline for consumption)
+  const beforeWindow = hist.filter(h => new Date(h.ts) < start);
+  const baseline = beforeWindow.length ? beforeWindow[beforeWindow.length - 1] : null;
+
+  return { filtered: inWindow, baseline, isFiltered: true };
+}
+
 function downloadMeterCSV(encKey) {
-  const key=decodeURIComponent(encKey);
-  const hist=historyData[key]||[];
-  if(!hist.length){alert('No history data for this meter yet.');return;}
-  const header='Timestamp,Meter Reading (m³),Consumption (m³),Battery,RSSI,SNR,Valve,Temperature\n';
-  const rows=hist.map((h,i)=>{
-    const prev=i>0?hist[i-1]:null;
-    let cons='';
-    if(prev&&h.meterReading!==null&&prev.meterReading!==null){
-      const diff=parseFloat(h.meterReading)-parseFloat(prev.meterReading);
-      cons=diff.toFixed(3); // e.g. 0.100 or -0.050
+  const key = decodeURIComponent(encKey);
+  const allHist = historyData[key] || [];
+  if (!allHist.length) { alert('No history data for this meter yet.'); return; }
+
+  const { filtered, baseline, isFiltered } = getFilteredHistForModal(allHist);
+
+  // Build the rows array: prepend baseline (if any) so first row gets a consumption delta
+  let rowsSource;
+  if (isFiltered && filtered.length === 0) {
+    alert('No data in this meter within the selected date/time range.'); return;
+  }
+  if (isFiltered) {
+    rowsSource = baseline ? [baseline, ...filtered] : filtered;
+  } else {
+    rowsSource = allHist;
+  }
+
+  // Build label for filename
+  const pad = n => String(n).padStart(2,'0');
+  let rangeSuffix = '';
+  if (isFiltered && isCustomRange) {
+    const s = customRangeStart, e = customRangeEnd;
+    rangeSuffix = `_${s.getFullYear()}${pad(s.getMonth()+1)}${pad(s.getDate())}-${e.getFullYear()}${pad(e.getMonth()+1)}${pad(e.getDate())}`;
+  } else if (isFiltered) {
+    rangeSuffix = '_' + histPeriod;
+  }
+
+  // Range meta comment at top of CSV
+  let metaLine = '';
+  if (isFiltered) {
+    const { start, end } = getPeriodRange(histPeriod);
+    const fmtDT = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    metaLine = `# Filtered range: ${fmtDT(start)} to ${fmtDT(end)} PHT\n`;
+  }
+
+  const header = 'Timestamp,Meter Reading (m³),Consumption (m³),Battery,RSSI,SNR,Valve,Temperature\n';
+  const rows = rowsSource.map((h, i) => {
+    const prev = i > 0 ? rowsSource[i-1] : null;
+    let cons = '';
+    if (prev && h.meterReading !== null && prev.meterReading !== null) {
+      const diff = parseFloat(h.meterReading) - parseFloat(prev.meterReading);
+      cons = diff.toFixed(3);
     }
-    return [h.ts,h.meterReading??'',cons,h.battery??'',h.rssi??'',h.snr??'',h.valve??'',h.temperature??''].join(',');
-  }).join('\n');
-  const blob=new Blob([header+rows],{type:'text/csv'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);
-  a.download=`${key}_history.csv`;
+    return [h.ts, h.meterReading ?? '', cons, h.battery ?? '', h.rssi ?? '', h.snr ?? '', h.valve ?? '', h.temperature ?? ''].join(',');
+  });
+
+  // If we prepended baseline, drop that first row from output (it was only for delta calc)
+  const outputRows = (isFiltered && baseline) ? rows.slice(1) : rows;
+
+  const blob = new Blob([metaLine + header + outputRows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${key}${rangeSuffix}_history.csv`;
   a.click();
 }
 
@@ -1407,15 +1648,34 @@ function downloadCSV() { if(modalMeterKey) downloadMeterCSV(modalMeterKey); }
 
 // ── MODAL ──
 function openModal(encKey, sn, eui) {
-  modalMeterKey=encKey;
-  const key=decodeURIComponent(encKey);
-  const hist=historyData[key]||[];
-  document.getElementById('modal-title').textContent='Meter: '+sn;
-  document.getElementById('modal-sub').textContent=(eui?'EUI: '+eui+' · ':'')+hist.length+' recorded readings';
-  document.getElementById('hist-count').textContent=hist.length+' records';
-  document.getElementById('modal-overlay').style.display='flex';
-  renderHistChart(hist);
-  renderHistTable(hist);
+  modalMeterKey = encKey;
+  const key = decodeURIComponent(encKey);
+  const allHist = historyData[key] || [];
+  const { filtered, baseline, isFiltered } = getFilteredHistForModal(allHist);
+  const displayHist = isFiltered ? filtered : allHist;
+
+  document.getElementById('modal-title').textContent = 'Meter: ' + sn;
+  document.getElementById('modal-sub').textContent = (eui ? 'EUI: ' + eui + ' · ' : '') + allHist.length + ' total readings';
+  document.getElementById('hist-count').textContent = displayHist.length + ' records' + (isFiltered ? ' (filtered)' : '');
+
+  // Show/hide range badge
+  const rangeBadge   = document.getElementById('modal-range-badge');
+  const allDataBadge = document.getElementById('modal-alldata-badge');
+  if (isFiltered) {
+    const pad = n => String(n).padStart(2,'0');
+    const { start, end } = getPeriodRange(histPeriod);
+    const fmtDT = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    rangeBadge.textContent = '📅 ' + fmtDT(start) + ' → ' + fmtDT(end) + ' PHT';
+    rangeBadge.style.display = '';
+    allDataBadge.style.display = 'none';
+  } else {
+    rangeBadge.style.display = 'none';
+    allDataBadge.style.display = '';
+  }
+
+  document.getElementById('modal-overlay').style.display = 'flex';
+  renderHistChart(displayHist, baseline, isFiltered);
+  renderHistTable(displayHist, baseline);
 }
 
 function closeModal(e) {
@@ -1424,61 +1684,139 @@ function closeModal(e) {
   if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
 }
 
-function setChartType(t,btn) {
-  modalChartType=t;
-  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
+function setChartType(t, btn) {
+  modalChartType = t;
+  document.querySelectorAll('.ctab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  const key=decodeURIComponent(modalMeterKey||'');
-  const hist=historyData[key]||[];
-  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
-  renderHistChart(hist);
+  const key = decodeURIComponent(modalMeterKey || '');
+  const allHist = historyData[key] || [];
+  const { filtered, baseline, isFiltered } = getFilteredHistForModal(allHist);
+  if (modalChartInst) { modalChartInst.destroy(); modalChartInst = null; }
+  renderHistChart(isFiltered ? filtered : allHist, baseline, isFiltered);
 }
 
-function renderHistChart(hist) {
-  const ctx=document.getElementById('hist-chart').getContext('2d');
-  if(modalChartInst){modalChartInst.destroy();modalChartInst=null;}
-  if(!hist.length){return;}
-  const labels=hist.map(h=>fmt(h.ts));
-  const data=hist.map(h=>h.meterReading);
-  modalChartInst=new Chart(ctx,{
-    type:modalChartType==='bar'?'bar':'line',
-    data:{labels,datasets:[{
-      label:'Meter reading (m³)',data,
-      borderColor:'#00d4ff',
-      backgroundColor:modalChartType==='bar'?'rgba(0,212,255,.3)':'rgba(0,212,255,.08)',
-      borderWidth:2,pointRadius:3,tension:.3,fill:modalChartType!=='bar'
-    }]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>`${v.parsed.y?.toFixed(3)} m³`}}},
-      scales:{x:{ticks:{color:'#6b7399',maxTicksLimit:10,font:{size:10}},grid:{color:'#252a38'}},
-        y:{ticks:{color:'#6b7399',font:{size:10},callback:v=>v.toFixed(2)},grid:{color:'#252a38'}}}}
+function renderHistChart(hist, baseline, isFiltered) {
+  const ctx = document.getElementById('hist-chart').getContext('2d');
+  if (modalChartInst) { modalChartInst.destroy(); modalChartInst = null; }
+  if (!hist.length) {
+    // Show empty state message on canvas
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#6b7399';
+    ctx.font = '13px DM Sans, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No data in this range', ctx.canvas.width / 2, 140);
+    return;
+  }
+
+  // If filtered and baseline exists, prepend it to show consumption from range start
+  let chartHist = hist;
+  if (isFiltered && baseline) {
+    chartHist = [baseline, ...hist];
+  }
+
+  const labels = chartHist.map(h => fmt(h.ts));
+  const data   = chartHist.map(h => h.meterReading);
+
+  // Consumption dataset (bar overlay) — delta between consecutive points
+  const consData = chartHist.map((h, i) => {
+    if (i === 0) return null;
+    const prev = chartHist[i-1];
+    if (h.meterReading === null || prev.meterReading === null) return null;
+    return parseFloat((parseFloat(h.meterReading) - parseFloat(prev.meterReading)).toFixed(3));
+  });
+
+  const datasets = [{
+    label: 'Meter reading (m³)',
+    data,
+    borderColor: '#00d4ff',
+    backgroundColor: modalChartType === 'bar' ? 'rgba(0,212,255,.3)' : 'rgba(0,212,255,.08)',
+    borderWidth: 2, pointRadius: 3, tension: .3, fill: modalChartType !== 'bar',
+    yAxisID: 'y',
+  }];
+
+  // Add consumption bars as a secondary dataset when in line mode
+  if (modalChartType !== 'bar') {
+    datasets.push({
+      label: 'Consumption (m³)',
+      data: consData,
+      type: 'bar',
+      backgroundColor: 'rgba(0,230,118,.25)',
+      borderColor: 'rgba(0,230,118,.5)',
+      borderWidth: 1,
+      yAxisID: 'y2',
+    });
+  }
+
+  // Shade the baseline point differently when filtered
+  const pointColors = isFiltered && baseline
+    ? ['rgba(255,179,0,.6)', ...Array(hist.length).fill('#00d4ff')]
+    : undefined;
+  if (pointColors) datasets[0].pointBackgroundColor = pointColors;
+
+  modalChartInst = new Chart(ctx, {
+    type: modalChartType === 'bar' ? 'bar' : 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: modalChartType !== 'bar', labels: { color: '#6b7399', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: v => {
+              if (v.dataset.label === 'Consumption (m³)') return v.parsed.y !== null ? `Δ ${v.parsed.y >= 0 ? '+' : ''}${v.parsed.y?.toFixed(3)} m³` : null;
+              return `${v.parsed.y?.toFixed(3)} m³`;
+            },
+            afterBody: (items) => {
+              if (isFiltered && baseline && items[0]?.dataIndex === 0) return ['(Baseline — before range)'];
+              return [];
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7399', maxTicksLimit: 10, font: { size: 10 } }, grid: { color: '#252a38' } },
+        y: { ticks: { color: '#6b7399', font: { size: 10 }, callback: v => v.toFixed(2) }, grid: { color: '#252a38' }, title: { display: true, text: 'Reading (m³)', color: '#6b7399', font: { size: 10 } } },
+        ...(modalChartType !== 'bar' ? { y2: { position: 'right', ticks: { color: '#00e676', font: { size: 10 }, callback: v => v.toFixed(3) }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Δ Consumption (m³)', color: '#00e676', font: { size: 10 } } } } : {})
+      }
+    }
   });
 }
 
-function renderHistTable(hist) {
-  const tbody=document.getElementById('hist-tbody');
-  if(!hist.length){tbody.innerHTML=`<tr><td colspan="6" class="no-history">📭 No history yet. Data is recorded every 60 seconds when the server is running.</td></tr>`;return;}
-  // Pre-compute consumption on original chronological order (current - previous)
-  const withCons = hist.map((h, i) => {
-    const prev = i > 0 ? hist[i-1] : null;
+function renderHistTable(hist, baseline) {
+  const tbody = document.getElementById('hist-tbody');
+  if (!hist.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="no-history">📭 No data in this range. Try widening the date/time window or selecting "All Time".</td></tr>`;
+    return;
+  }
+
+  // Build source array: prepend baseline for correct first-row consumption delta
+  const source = baseline ? [baseline, ...hist] : hist;
+
+  const withCons = source.map((h, i) => {
+    const prev = i > 0 ? source[i-1] : null;
     let cons = '—';
     if (prev && h.meterReading !== null && prev.meterReading !== null) {
       const diff = parseFloat(h.meterReading) - parseFloat(prev.meterReading);
       cons = diff >= 0 ? '+' + diff.toFixed(3) : diff.toFixed(3);
     }
-    return { ...h, cons };
+    return { ...h, cons, _isBaseline: i === 0 && !!baseline };
   });
+
+  // Drop baseline row from display (it was only for delta calculation)
+  const displayRows = baseline ? withCons.slice(1) : withCons;
+
   // Show newest first
-  const rows = [...withCons].reverse();
-  tbody.innerHTML=rows.map((h)=>{
+  const rows = [...displayRows].reverse();
+  tbody.innerHTML = rows.map(h => {
     const cons = h.cons;
-    const consColor = cons==='—'?'var(--muted)': cons.startsWith('+')?'var(--green)':'var(--red)';
+    const consColor = cons === '—' ? 'var(--muted)' : cons.startsWith('+') ? 'var(--green)' : 'var(--red)';
     return `<tr>
       <td class="tval">${fmt(h.ts)}</td>
-      <td style="font-family:var(--mono)">${h.meterReading!==null?parseFloat(h.meterReading).toFixed(3)+' m³':'—'}</td>
-      <td style="color:${consColor};font-family:var(--mono)">${cons!=='—'?cons+' m³':cons}</td>
-      <td>${h.battery??'—'}</td>
-      <td class="${rssiCls(h.rssi)}">${h.rssi??'—'}</td>
-      <td>${h.valve?`<span class="${h.valve.toLowerCase()==='open'?'vo':'vc'}">${h.valve}</span>`:'—'}</td>
+      <td style="font-family:var(--mono)">${h.meterReading !== null ? parseFloat(h.meterReading).toFixed(3) + ' m³' : '—'}</td>
+      <td style="color:${consColor};font-family:var(--mono)">${cons !== '—' ? cons + ' m³' : cons}</td>
+      <td>${h.battery ?? '—'}</td>
+      <td class="${rssiCls(h.rssi)}">${h.rssi ?? '—'}</td>
+      <td>${h.valve ? `<span class="${h.valve.toLowerCase() === 'open' ? 'vo' : 'vc'}">${h.valve}</span>` : '—'}</td>
     </tr>`;
   }).join('');
 }

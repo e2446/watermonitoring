@@ -1,3 +1,4 @@
+require('dotenv').config();
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
@@ -12,33 +13,33 @@ try { nodemailer = require('nodemailer'); } catch(e) {
 }
 
 const CONFIG = {
-  username: 'redlink',
-  password: 'redlink123456',
+  username: process.env.IOT_USERNAME,
+  password: process.env.IOT_PASSWORD,
   applications: [
     { id: 1298, name: 'PrepaidWaterMeter-042026' },
     { id: 1285, name: 'Cyble-032026' }
   ],
-  host: 'sindconiot.com',
-  refreshInterval: 60000,
-  port: 3000,
-  historyFile: path.join(__dirname, 'history.json'),
+  host: process.env.IOT_HOST,
+  refreshInterval: parseInt(process.env.REFRESH_INTERVAL) || 60000,
+  port: parseInt(process.env.PORT) || 3000,
+  historyDir:  path.join(__dirname, 'history'),
+  historyFile: path.join(__dirname, 'history', 'history.json'),
   customersFile: path.join(__dirname, 'customers.json'),
-  maxSnapshotsPerMeter: 2000,
-  googleSheetURL: 'https://docs.google.com/spreadsheets/d/1JGwdwxvQoF9P8DdC0SZ3D9IH8npnd60ExbTXIpqQeIw/export?format=csv&gid=1333564699',
+  maxSnapshotsPerMeter: parseInt(process.env.MAX_SNAPSHOTS_PER_METER) || 2000,
+  googleSheetURL: process.env.GOOGLE_SHEET_URL,
 
   // ── GMAIL SETTINGS ──────────────────────────────────────────────────────────
-  // Step 1: Replace with your Gmail address
   gmail: {
-    from:         'Redlink Water Utility <redlinkresearchdevelopment@gmail.com>',
-    user:         'redlinkresearchdevelopment@gmail.com',
-    appPassword:  'rpdd hpta qgxr ncko',
+    from:        process.env.GMAIL_FROM,
+    user:        process.env.GMAIL_USER,
+    appPassword: process.env.GMAIL_APP_PASSWORD,
   },
 
   // ── MANAGEMENT ACCOUNTS ─────────────────────────────────────────────────────
   // Each account maps to one application only
   mgmtAccounts: [
-    { username: 'redlinkcebu',  password: 'redlink', appName: 'Cyble-032026',             org: 'Redlink Cebu' },
-    { username: 'redlinkormoc', password: 'redlink', appName: 'PrepaidWaterMeter-042026',  org: 'Redlink Ormoc' },
+    { username: process.env.MGMT_USER_1, password: process.env.MGMT_PASS_1, appName: process.env.MGMT_APP_1, org: process.env.MGMT_ORG_1 },
+    { username: process.env.MGMT_USER_2, password: process.env.MGMT_PASS_2, appName: process.env.MGMT_APP_2, org: process.env.MGMT_ORG_2 },
   ],
 
   // ── AUTO-BILLING SCHEDULER ─────────────────────────────────────────────────
@@ -56,14 +57,16 @@ const CONFIG = {
 
     // Water rate defaults used for auto-generated bills
     rates: {
-      minCharge:   120,
-      minCubic:    10,
-      perCubic:    15,
-      envFee:      5,
-      sysCharge:   10,
-      vatPct:      12,
-      utilityName: 'Redlink Water Utility',
-      address:     'Ormoc City, Leyte',
+      minCharge:      120,
+      minCubic:       10,
+      perCubic:       15,
+      envFee:         5,
+      sysCharge:      10,
+      scpwdPct:       0,
+      withholdingPct: 0,
+      utilityName:    'Redlink Water Utility',
+      address:        'Ormoc City, Leyte',
+      tin:            '',
     },
   },
   // ───────────────────────────────────────────────────────────────────────────
@@ -233,13 +236,216 @@ function getPHTISO() {
   return `${pht.getFullYear()}-${pad(pht.getMonth()+1)}-${pad(pht.getDate())}T${pad(pht.getHours())}:${pad(pht.getMinutes())}:${pad(pht.getSeconds())}+08:00`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ── MONTHLY ARCHIVE SYSTEM ────────────────────────────────────────────────────
+// history.json        = current month only (stays small)
+// history-YYYY-MM.json = archived months   (kept forever, never trimmed)
+//
+// On month rollover (detected every refresh), old month is saved to its
+// archive file and history.json is cleared for the new month.
+// All API endpoints can query any archived month via ?month=YYYY-MM
+// ══════════════════════════════════════════════════════════════════════════════
+
+function getArchivePath(year, month) {
+  return path.join(CONFIG.historyDir, `history-${year}-${String(month).padStart(2,'0')}.json`);
+}
+
+function getCurrentPHTMonth() {
+  const phtOffset = 8 * 60;
+  const utc = Date.now() + new Date().getTimezoneOffset() * 60000;
+  const pht = new Date(utc + phtOffset * 60000);
+  return { year: pht.getFullYear(), month: pht.getMonth() + 1 };
+}
+
+// Detect which month the bulk of history.json belongs to
+function detectHistoryMonth() {
+  for (const snaps of Object.values(history)) {
+    for (let i = snaps.length - 1; i >= 0; i--) {
+      const ts = snaps[i]?.ts;
+      if (ts) {
+        const d = new Date(ts);
+        return { year: d.getFullYear(), month: d.getMonth() + 1 };
+      }
+    }
+  }
+  return null;
+}
+
+// Save current history into the archive file for that month (merges if exists)
+function archiveMonth(year, month) {
+  const archivePath = getArchivePath(year, month);
+  try {
+    let existing = {};
+    if (fs.existsSync(archivePath)) {
+      existing = JSON.parse(fs.readFileSync(archivePath, 'utf8'));
+    }
+    // Merge: add any records not already in archive
+    const merged = { ...existing };
+    for (const [key, snaps] of Object.entries(history)) {
+      if (!merged[key]) merged[key] = [];
+      const existingTs = new Set(merged[key].map(s => s.ts));
+      for (const s of snaps) {
+        if (!existingTs.has(s.ts)) merged[key].push(s);
+      }
+      merged[key].sort((a, b) => new Date(a.ts) - new Date(b.ts));
+    }
+    fs.writeFileSync(archivePath, JSON.stringify(merged), 'utf8');
+    const label = `${year}-${String(month).padStart(2,'0')}`;
+    const total = Object.values(merged).reduce((s,a) => s + a.length, 0);
+    console.log(`[Archive] ✅ Saved ${label} → history/history-${label}.json (${total} snapshots)`);
+  } catch(e) {
+    console.error('[Archive] Error saving archive:', e.message);
+  }
+}
+
+// Load a specific archived month from disk (returns {} if not found)
+function loadArchive(year, month) {
+  const archivePath = getArchivePath(year, month);
+  try {
+    if (fs.existsSync(archivePath)) {
+      return JSON.parse(fs.readFileSync(archivePath, 'utf8'));
+    }
+  } catch(e) { console.error('[Archive] Load error:', e.message); }
+  return {};
+}
+
+// Get all available archived months as 'YYYY-MM' strings
+function listArchiveMonths() {
+  try {
+    if (!fs.existsSync(CONFIG.historyDir)) return [];
+    return fs.readdirSync(CONFIG.historyDir)
+      .filter(f => /^history-\d{4}-\d{2}\.json$/.test(f))
+      .map(f => f.replace('history-', '').replace('.json', ''))
+      .sort();
+  } catch(e) { return []; }
+}
+
+// Get merged history for a meter across current month + all archives
+// (used for Consumption History page which shows all-time data)
+function getAllTimeHistory(meterKey) {
+  const archiveMonths = listArchiveMonths();
+  let combined = [];
+  const seenTs = new Set();
+
+  // Load all archives first (oldest → newest)
+  for (const monthStr of archiveMonths) {
+    const [year, month] = monthStr.split('-').map(Number);
+    const arc = loadArchive(year, month);
+    for (const snap of (arc[meterKey] || [])) {
+      if (!seenTs.has(snap.ts)) { combined.push(snap); seenTs.add(snap.ts); }
+    }
+  }
+  // Then add current month
+  for (const snap of (history[meterKey] || [])) {
+    if (!seenTs.has(snap.ts)) { combined.push(snap); seenTs.add(snap.ts); }
+  }
+  combined.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+  return combined;
+}
+
+// Get merged history for a meter filtered to a custom date range (across all archives + current)
+function getAllTimeHistoryRange(meterKey, fromTs, toTs) {
+  const all = getAllTimeHistory(meterKey);
+  const from = new Date(fromTs);
+  const to   = new Date(toTs);
+  // Include one snapshot just before the range as the baseline for consumption calc
+  const before  = all.filter(h => new Date(h.ts) < from && h.meterReading !== null);
+  const inRange = all.filter(h => { const t = new Date(h.ts); return t >= from && t <= to; });
+  // Return baseline snap + in-range snaps so the client can compute consumption
+  const baseline = before.length ? [before[before.length - 1]] : [];
+  return [...baseline, ...inRange];
+}
+
+// Get all-meter data merged across archives for a custom date range
+function getAllMetersHistoryRange(fromTs, toTs) {
+  const archiveMonths = listArchiveMonths();
+  const from = new Date(fromTs);
+  const to   = new Date(toTs);
+  const combined = {}; // { meterKey: [snaps] }
+  const seenTs   = {}; // { meterKey: Set }
+
+  function addSnap(key, snap) {
+    if (!combined[key]) { combined[key] = []; seenTs[key] = new Set(); }
+    if (!seenTs[key].has(snap.ts)) { combined[key].push(snap); seenTs[key].add(snap.ts); }
+  }
+
+  // Load archives
+  for (const monthStr of archiveMonths) {
+    const [year, month] = monthStr.split('-').map(Number);
+    const arc = loadArchive(year, month);
+    for (const [key, snaps] of Object.entries(arc)) {
+      for (const snap of snaps) addSnap(key, snap);
+    }
+  }
+  // Add current month
+  for (const [key, snaps] of Object.entries(history)) {
+    for (const snap of snaps) addSnap(key, snap);
+  }
+
+  // For each meter, keep one snapshot before the range (baseline) + all snaps in range
+  const result = {};
+  for (const [key, snaps] of Object.entries(combined)) {
+    snaps.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+    const before  = snaps.filter(h => new Date(h.ts) < from && h.meterReading !== null);
+    const inRange = snaps.filter(h => { const t = new Date(h.ts); return t >= from && t <= to; });
+    if (inRange.length || before.length) {
+      const baseline = before.length ? [before[before.length - 1]] : [];
+      result[key] = [...baseline, ...inRange];
+    }
+  }
+  return result;
+}
+
+// Track current month to detect rollover
+let _currentMonthKey = null;
+
+function checkMonthRollover() {
+  const cur = getCurrentPHTMonth();
+  const key = `${cur.year}-${String(cur.month).padStart(2,'0')}`;
+  if (_currentMonthKey === null) {
+    _currentMonthKey = key;
+    return; // first run, nothing to rollover
+  }
+  if (_currentMonthKey !== key) {
+    // Month changed! Archive the old month data then clear for new month.
+    const [oldYear, oldMonth] = _currentMonthKey.split('-').map(Number);
+    console.log(`[Archive] 🗓️  Month rollover: ${_currentMonthKey} → ${key}`);
+    archiveMonth(oldYear, oldMonth);
+    // Keep only the last snapshot of each meter in history.json
+    // so the dashboard still shows the last known reading
+    const bridge = {};
+    for (const [k, snaps] of Object.entries(history)) {
+      if (snaps.length) bridge[k] = [snaps[snaps.length - 1]];
+    }
+    history = bridge;
+    saveHistory();
+    _currentMonthKey = key;
+    console.log(`[Archive] ✅ New month started: ${key}`);
+  }
+}
+
 // ── LOAD HISTORY ──
 function loadHistory() {
   try {
     if (fs.existsSync(CONFIG.historyFile)) {
       history = JSON.parse(fs.readFileSync(CONFIG.historyFile, 'utf8'));
-      const total = Object.values(history).reduce((s,a)=>s+a.length,0);
+      const total = Object.values(history).reduce((s,a) => s + a.length, 0);
       console.log(`[History] Loaded ${Object.keys(history).length} meters, ${total} snapshots`);
+
+      // On startup: if history.json has data from a past month, archive it first
+      const histMonth = detectHistoryMonth();
+      const curMonth  = getCurrentPHTMonth();
+      if (histMonth && (histMonth.year !== curMonth.year || histMonth.month !== curMonth.month)) {
+        console.log(`[History] ⚠️  history.json is from ${histMonth.year}-${String(histMonth.month).padStart(2,'0')}, archiving...`);
+        archiveMonth(histMonth.year, histMonth.month);
+        // Keep only last snapshot per meter as bridge to new month
+        const bridge = {};
+        for (const [k, snaps] of Object.entries(history)) {
+          if (snaps.length) bridge[k] = [snaps[snaps.length - 1]];
+        }
+        history = bridge;
+        saveHistory();
+      }
     }
   } catch(e) { console.error('[History] Load error:', e.message); history = {}; }
 }
@@ -251,6 +457,7 @@ function saveHistory() {
 }
 
 function recordSnapshot(nodes) {
+  checkMonthRollover(); // ← auto-archive on month change
   const ts = getPHTISO();
   let changed = false;
   nodes.forEach(n => {
@@ -597,18 +804,83 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── GET /api/history — all meters ──
+  // ── GET /api/history/archives — list all available months ──
+  if (req.url === '/api/history/archives') {
+    const cur = getCurrentPHTMonth();
+    const curKey = `${cur.year}-${String(cur.month).padStart(2,'0')}`;
+    const months = [...new Set([...listArchiveMonths(), curKey])].sort();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ current: curKey, months }));
+    return;
+  }
+
+  // ── GET /api/history/archive/YYYY-MM — full archived month (all meters) ──
+  if (req.url.startsWith('/api/history/archive/')) {
+    const monthStr = req.url.replace('/api/history/archive/', '').split('?')[0];
+    const [year, month] = monthStr.split('-').map(Number);
+    const cur = getCurrentPHTMonth();
+    const data = (year === cur.year && month === cur.month)
+      ? history
+      : loadArchive(year, month);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  // ── GET /api/history — current month all meters ──
   if (req.url === '/api/history') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(history));
     return;
   }
 
-  // ── GET /api/history/SN — specific meter ──
-  if (req.url.startsWith('/api/history/')) {
-    const key = decodeURIComponent(req.url.replace('/api/history/', ''));
+  // ── GET /api/history/range — all meters, custom date range ?from=ISO&to=ISO ──
+  if (req.url.startsWith('/api/history/range')) {
+    const params = new URLSearchParams(req.url.split('?')[1] || '');
+    const fromParam = params.get('from');
+    const toParam   = params.get('to');
+    if (!fromParam || !toParam) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing from or to parameter' }));
+      return;
+    }
+    const data = getAllMetersHistoryRange(fromParam, toParam);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(history[key] || []));
+    res.end(JSON.stringify(data));
+    return;
+  }
+
+  // ── GET /api/history/:SN — one meter, supports ?month=YYYY-MM, ?alltime=1, or ?from=ISO&to=ISO ──
+  if (req.url.startsWith('/api/history/')) {
+    const parts = req.url.replace('/api/history/', '').split('?');
+    const key = decodeURIComponent(parts[0]);
+    const params = new URLSearchParams(parts[1] || '');
+    const monthParam = params.get('month');
+    const allTime    = params.get('alltime');
+    const fromParam  = params.get('from');
+    const toParam    = params.get('to');
+
+    let data;
+    if (fromParam && toParam) {
+      // Custom date range: merge archives + current, return baseline + in-range snaps
+      data = getAllTimeHistoryRange(key, fromParam, toParam);
+    } else if (allTime) {
+      // All-time: merge current + all archives for this meter
+      data = getAllTimeHistory(key);
+    } else if (monthParam) {
+      // Specific archived month
+      const [year, month] = monthParam.split('-').map(Number);
+      const cur = getCurrentPHTMonth();
+      const src = (year === cur.year && month === cur.month)
+        ? history
+        : loadArchive(year, month);
+      data = src[key] || [];
+    } else {
+      // Default: current month only
+      data = history[key] || [];
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(data));
     return;
   }
 
@@ -701,7 +973,10 @@ function buildEmailHTML({ customer, bill, meter, rates, period, billNo, dueDate 
   const fmt  = v => '₱' + parseFloat(v).toFixed(2);
   const fmtM = v => parseFloat(v).toFixed(3) + ' m³';
   const due  = dueDate ? new Date(dueDate).toLocaleDateString('en-PH',{year:'numeric',month:'long',day:'numeric'}) : '—';
+  const dueDateShort = dueDate ? new Date(dueDate).toLocaleDateString('en-PH') : '—';
   const excess = Math.max(0, meter.consumed - rates.minCubic);
+  const startFmt = meter.startDate ? String(meter.startDate).replace('T',' ').replace('+08:00','').substring(0,16) : '—';
+  const endFmt   = meter.endDate   ? String(meter.endDate).replace('T',' ').replace('+08:00','').substring(0,16)   : '—';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -710,73 +985,162 @@ function buildEmailHTML({ customer, bill, meter, rates, period, billNo, dueDate 
 <body style="margin:0;padding:0;background:#f0f4f8;font-family:'Segoe UI',Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4f8;padding:30px 0">
 <tr><td align="center">
-<table width="620" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.10)">
+<table width="640" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.10)">
 
   <!-- HEADER -->
-  <tr><td style="background:linear-gradient(135deg,#0d7abf 0%,#0a5a8f 100%);padding:32px 36px">
+  <tr><td style="background:#0d7abf;padding:20px 32px">
     <table width="100%"><tr>
-      <td><span style="font-size:28px;font-weight:900;color:#fff;letter-spacing:1px">💧 ${rates.utilityName}</span><br>
-          <span style="font-size:13px;color:rgba(255,255,255,0.75)">${rates.address}</span></td>
-      <td align="right"><span style="font-size:22px;font-weight:700;color:#fff">WATER BILL</span><br>
-          <span style="font-size:12px;color:rgba(255,255,255,0.75);font-family:monospace">${billNo}</span><br>
-          <span style="font-size:12px;color:rgba(255,255,255,0.75)">${period}</span></td>
+      <td style="text-align:center">
+        <div style="font-size:11px;color:rgba(255,255,255,.8)">Republic of the Philippines</div>
+        <div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:1px">${rates.utilityName.toUpperCase()}</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.8)">${rates.address}</div>
+        ${rates.tin ? `<div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:2px">NON-VAT REG. TIN: ${rates.tin}</div>` : '<div style="font-size:10px;color:rgba(255,255,255,.7);margin-top:2px">NON-VAT</div>'}
+      </td>
     </tr></table>
   </td></tr>
 
-  <!-- DUE DATE BANNER -->
-  <tr><td style="background:#fff3cd;padding:12px 36px;border-bottom:3px solid #ffb300">
-    <span style="font-size:14px;color:#7a5c00">⏰ <strong>Payment Due:</strong> ${due} &nbsp;·&nbsp; Please pay on or before this date to avoid disconnection.</span>
+  <!-- INVOICE TITLE -->
+  <tr><td style="padding:20px 32px 0">
+    <table width="100%"><tr>
+      <td>
+        <span style="font-size:24px;color:#c00;font-weight:900">Service </span>
+        <span style="font-size:24px;color:#111;font-weight:900">INVOICE</span>
+      </td>
+      <td align="right">
+        <div style="font-family:monospace;font-size:14px;font-weight:700">${billNo}</div>
+        <div style="font-size:12px;color:#555">Date: ${dueDateShort}</div>
+      </td>
+    </tr></table>
   </td></tr>
 
-  <!-- CUSTOMER & METER INFO -->
-  <tr><td style="padding:28px 36px 0">
+  <!-- CUSTOMER INFO -->
+  <tr><td style="padding:16px 32px 0">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #dde;border-radius:8px;overflow:hidden">
+      <tr style="background:#f8f9fa">
+        <td style="padding:10px 14px;font-size:12px;color:#666;width:35%">Customer Acct. No.</td>
+        <td style="padding:10px 14px;font-size:13px;font-family:monospace;font-weight:700">${meter.key.slice(-8)}</td>
+        <td style="padding:10px 14px;font-size:12px;color:#666;width:20%">Billing Period</td>
+        <td style="padding:10px 14px;font-size:13px;font-weight:700">${period}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 14px;font-size:12px;color:#666;border-top:1px solid #eee">Customer Name</td>
+        <td style="padding:10px 14px;font-size:13px;font-weight:700;border-top:1px solid #eee">${customer.fullName}</td>
+        <td style="padding:10px 14px;font-size:12px;color:#666;border-top:1px solid #eee">Due Date</td>
+        <td style="padding:10px 14px;font-size:13px;font-weight:700;color:#c00;border-top:1px solid #eee">${due}</td>
+      </tr>
+      <tr style="background:#f8f9fa">
+        <td style="padding:10px 14px;font-size:12px;color:#666;border-top:1px solid #eee">Customer Address</td>
+        <td style="padding:10px 14px;font-size:13px;border-top:1px solid #eee" colspan="3">${customer.address}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 14px;font-size:12px;color:#666;border-top:1px solid #eee">Meter Serial / EUI</td>
+        <td style="padding:10px 14px;font-size:11px;font-family:monospace;border-top:1px solid #eee" colspan="3">${meter.key} / ${meter.devEUI || '—'}</td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- TWO-COLUMN INVOICE BODY -->
+  <tr><td style="padding:16px 32px 0">
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr valign="top">
-      <td width="48%" style="background:#f8fafc;border-radius:8px;padding:18px 20px;border:1px solid #e2e8f0">
-        <p style="margin:0 0 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b">Account Information</p>
-        <p style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1e293b">${customer.fullName}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#64748b">${customer.address}</p>
-        <p style="margin:0 0 4px;font-size:13px;color:#64748b">📞 ${customer.contactNumber}</p>
-        <p style="margin:0;font-size:13px;color:#64748b">✉️ ${customer.emailAddress}</p>
+
+      <!-- LEFT: IN PAYMENT OF / SERVICES -->
+      <td width="48%" style="border:1px solid #dde;border-radius:8px;padding:14px 16px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#555;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:6px">In Payment Of / Services</div>
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:6px 0;font-size:13px;font-weight:700;color:#0d7abf">Water Fee</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-weight:700;font-size:14px">${bill.waterCharge.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0 4px 10px;font-size:12px;color:#555">Environmental Fee</td>
+            <td style="padding:4px 0;text-align:right;font-family:monospace;font-size:12px">${bill.envFee.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0 4px 10px;font-size:12px;color:#555">System/Service Charge</td>
+            <td style="padding:4px 0;text-align:right;font-family:monospace;font-size:12px">${bill.sysCharge.toFixed(2)}</td>
+          </tr>
+          <tr><td colspan="2" style="padding:8px 0 4px;font-size:11px;color:#888;border-top:1px solid #eee">
+            Min. Charge: ₱${rates.minCharge.toFixed(2)} (first ${rates.minCubic} m³)
+            ${excess > 0 ? `<br>Excess: ${fmtM(excess)} × ₱${rates.perCubic.toFixed(2)}/m³ = ₱${(excess*rates.perCubic).toFixed(2)}` : ''}
+          </td></tr>
+          <tr><td colspan="2" style="padding:6px 0;font-size:11px;color:#888">
+            Consumption: <strong style="color:#333">${fmtM(meter.consumed)}</strong><br>
+            Prev: ${fmtM(meter.startReading)} (${startFmt})<br>
+            Curr: ${fmtM(meter.endReading)} (${endFmt})
+          </td></tr>
+        </table>
       </td>
+
       <td width="4%"></td>
-      <td width="48%" style="background:#f8fafc;border-radius:8px;padding:18px 20px;border:1px solid #e2e8f0">
-        <p style="margin:0 0 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b">Meter Information</p>
-        <p style="margin:0 0 5px;font-size:12px;color:#64748b">Serial: <strong style="color:#1e293b;font-family:monospace">${meter.key}</strong></p>
-        <p style="margin:0 0 5px;font-size:12px;color:#64748b">Device EUI: <strong style="color:#1e293b;font-family:monospace;font-size:11px">${meter.devEUI || '—'}</strong></p>
-        <p style="margin:0 0 5px;font-size:12px;color:#64748b">Billing Period: <strong style="color:#1e293b">${period}</strong></p>
-        <p style="margin:0;font-size:12px;color:#64748b">Type: <strong style="color:#1e293b">LoRaWAN Smart Meter</strong></p>
+
+      <!-- RIGHT: TOTALS -->
+      <td width="48%" style="border:1px solid #dde;border-radius:8px;padding:14px 16px">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:7px 0;font-size:13px;font-weight:700;color:#111">TOTAL SALES</td>
+            <td style="padding:7px 0;text-align:right;font-family:monospace;font-weight:700;font-size:14px">${bill.totalSales.toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:1px solid #eee">
+            <td style="padding:6px 0;font-size:12px;color:#555">Less: Disc. (SC/SP/NAAC/MOV/PWD)</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-size:12px">${bill.scpwdDiscount > 0 ? bill.scpwdDiscount.toFixed(2) : '—'}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#555">Less: Rebates</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-size:12px">${bill.lessRebates.toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:2px solid #333">
+            <td style="padding:7px 0;font-size:13px;font-weight:700;color:#111">TOTAL DUE</td>
+            <td style="padding:7px 0;text-align:right;font-family:monospace;font-weight:700;font-size:13px"></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#555">Less: Withholding</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-size:12px">${bill.lessWithholding > 0 ? bill.lessWithholding.toFixed(2) : '—'}</td>
+          </tr>
+          <tr style="background:#0d7abf">
+            <td style="padding:10px 8px;font-size:14px;font-weight:700;color:#fff">TOTAL AMOUNT DUE &nbsp;₱</td>
+            <td style="padding:10px 8px;text-align:right;font-family:monospace;font-weight:900;font-size:18px;color:#fff">${bill.totalAmountDue.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#555;border-top:1px solid #eee">Amount Received</td>
+            <td style="padding:6px 0;font-family:monospace;font-size:12px;border-top:1px solid #eee;border-bottom:1px solid #aaa;text-align:right">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#555">Sales Subject to Pt / Exempt Sales</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-size:12px">${bill.totalSales.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#555">Change</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-size:12px">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;font-size:12px;color:#555">Balance</td>
+            <td style="padding:6px 0;text-align:right;font-family:monospace;font-size:12px">&nbsp;</td>
+          </tr>
+        </table>
       </td>
+
     </tr>
     </table>
   </td></tr>
 
-  <!-- CONSUMPTION TABLE -->
-  <tr><td style="padding:24px 36px 0">
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
-      <tr style="background:#0d7abf">
-        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Description</th>
-        <th style="padding:12px 16px;text-align:left;font-size:12px;color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Details</th>
-        <th style="padding:12px 16px;text-align:right;font-size:12px;color:#fff;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Amount</th>
-      </tr>
-      <tr style="background:#f0f9ff"><td style="padding:11px 16px;font-size:13px;color:#1e293b"><strong>Previous Reading</strong></td><td style="padding:11px 16px;font-size:13px;color:#64748b">${fmtM(meter.startReading)}</td><td style="padding:11px 16px;text-align:right;font-size:13px;font-family:monospace"></td></tr>
-      <tr style="background:#f0f9ff"><td style="padding:11px 16px;font-size:13px;color:#1e293b;border-bottom:2px solid #bae6fd"><strong>Current Reading</strong></td><td style="padding:11px 16px;font-size:13px;color:#64748b;border-bottom:2px solid #bae6fd">${fmtM(meter.endReading)}</td><td style="padding:11px 16px;text-align:right;font-size:13px;font-family:monospace;border-bottom:2px solid #bae6fd"></td></tr>
-      <tr style="background:#e0f2fe"><td style="padding:11px 16px;font-size:13px;color:#0369a1"><strong>Total Consumption</strong></td><td style="padding:11px 16px;font-size:13px;color:#0369a1;font-weight:700">${fmtM(meter.consumed)}</td><td style="padding:11px 16px;text-align:right;font-size:13px;font-family:monospace;font-weight:700;color:#0369a1">${fmtM(meter.consumed)}</td></tr>
-      <tr><td colspan="3" style="padding:4px"></td></tr>
-      <tr><td style="padding:10px 16px;font-size:13px;color:#374151">Minimum Charge (first ${rates.minCubic} m³)</td><td style="padding:10px 16px;font-size:12px;color:#6b7280">minimum block rate</td><td style="padding:10px 16px;text-align:right;font-size:13px;font-family:monospace">${fmt(rates.minCharge)}</td></tr>
-      ${excess > 0 ? `<tr><td style="padding:10px 16px;font-size:13px;color:#374151">Excess Consumption</td><td style="padding:10px 16px;font-size:12px;color:#6b7280">${fmtM(excess)} × ${fmt(rates.perCubic)}/m³</td><td style="padding:10px 16px;text-align:right;font-size:13px;font-family:monospace">${fmt(excess * rates.perCubic)}</td></tr>` : ''}
-      <tr><td style="padding:10px 16px;font-size:13px;color:#374151">Environmental Fee</td><td style="padding:10px 16px;font-size:12px;color:#6b7280">fixed</td><td style="padding:10px 16px;text-align:right;font-size:13px;font-family:monospace">${fmt(rates.envFee)}</td></tr>
-      <tr><td style="padding:10px 16px;font-size:13px;color:#374151">System/Service Charge</td><td style="padding:10px 16px;font-size:12px;color:#6b7280">fixed</td><td style="padding:10px 16px;text-align:right;font-size:13px;font-family:monospace">${fmt(rates.sysCharge)}</td></tr>
-      <tr style="background:#f8fafc"><td style="padding:11px 16px;font-size:13px;font-weight:700;color:#1e293b;border-top:1px solid #e2e8f0">Subtotal</td><td style="border-top:1px solid #e2e8f0"></td><td style="padding:11px 16px;text-align:right;font-size:13px;font-family:monospace;font-weight:700;border-top:1px solid #e2e8f0">${fmt(bill.subtotal)}</td></tr>
-      <tr><td style="padding:10px 16px;font-size:13px;color:#374151">VAT (${rates.vatPct}%)</td><td style="padding:10px 16px;font-size:12px;color:#6b7280">${rates.vatPct}% of subtotal</td><td style="padding:10px 16px;text-align:right;font-size:13px;font-family:monospace">${fmt(bill.vat)}</td></tr>
-      <tr style="background:#0d7abf"><td style="padding:14px 16px;font-size:15px;font-weight:700;color:#fff">TOTAL AMOUNT DUE</td><td></td><td style="padding:14px 16px;text-align:right;font-size:17px;font-family:monospace;font-weight:900;color:#fff">${fmt(bill.total)}</td></tr>
-    </table>
-  </td></tr>
-
   <!-- FOOTER -->
-  <tr><td style="padding:24px 36px 32px">
-    <p style="margin:0 0 6px;font-size:12px;color:#94a3b8;text-align:center">This is a system-generated bill from your LoRaWAN smart water meter.</p>
-    <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center">For inquiries, please contact <strong>${rates.utilityName}</strong> · ${rates.address}</p>
+  <tr><td style="padding:20px 32px 28px">
+    <table width="100%"><tr valign="bottom">
+      <td style="font-size:12px;color:#888;max-width:300px;line-height:1.6">
+        Please pay on or before <strong>${due}</strong>.<br>
+        Late payment may result in disconnection.<br>
+        For inquiries, contact your water utility office.<br>
+        This bill is system-generated via LoRaWAN smart metering.
+      </td>
+      <td align="right" style="font-size:11px;color:#aaa;text-align:right">
+        <div style="border:2px solid #0d7abf;display:inline-block;padding:5px 14px;border-radius:6px;color:#0d7abf;font-size:16px;font-weight:900;letter-spacing:2px;opacity:.4">UNPAID</div>
+        <div style="margin-top:40px;border-top:1px solid #aaa;width:160px;margin-left:auto"></div>
+        <div>Issued by / Authorized Signature</div>
+        <div style="font-weight:700;color:#333">${rates.utilityName}</div>
+        <div style="margin-top:6px;color:#bbb">THIS DOCUMENT IS NOT VALID FOR CLAIMING INPUT TAXES.</div>
+      </td>
+    </tr></table>
   </td></tr>
 
 </table>
@@ -813,17 +1177,27 @@ function saveAutoBillingLog() {
 // ── Billing math (mirrors billing.html logic) ──────────────────────────────
 function calcBillServer(consumed, rates) {
   const c = Math.max(0, consumed);
-  if (c === 0) return { waterCharge:0, envFee:0, sysCharge:0, subtotal:0, vat:0, total:0, isZero:true };
+  if (c === 0) return { waterCharge:0, envFee:0, sysCharge:0, totalSales:0, scpwdDiscount:0, lessRebates:0, totalDue:0, lessWithholding:0, totalAmountDue:0, total:0, isZero:true };
   let waterCharge = rates.minCharge;
   if (c > rates.minCubic) waterCharge += (c - rates.minCubic) * rates.perCubic;
-  const subtotal = waterCharge + rates.envFee + rates.sysCharge;
-  const vat      = subtotal * (rates.vatPct / 100);
-  const total    = subtotal + vat;
-  return { waterCharge, envFee: rates.envFee, sysCharge: rates.sysCharge, subtotal, vat, total, isZero: false };
+  const totalSales      = waterCharge + rates.envFee + rates.sysCharge;
+  const scpwdDiscount   = totalSales * ((rates.scpwdPct || 0) / 100);
+  const lessRebates     = totalSales;
+  const totalDue        = totalSales - scpwdDiscount;
+  const lessWithholding = totalDue * ((rates.withholdingPct || 0) / 100);
+  const totalAmountDue  = totalDue - lessWithholding;
+  return { waterCharge, envFee: rates.envFee, sysCharge: rates.sysCharge,
+           totalSales, scpwdDiscount, lessRebates, totalDue, lessWithholding,
+           totalAmountDue, total: totalAmountDue, isZero: false };
 }
 
 function getMonthConsumptionServer(meterKey, year, month) {
-  const hist = history[meterKey] || [];
+  // Use archive for past months, live history for current month
+  const cur = getCurrentPHTMonth();
+  const src = (year === cur.year && month === cur.month)
+    ? history
+    : loadArchive(year, month);
+  const hist = src[meterKey] || [];
   if (!hist.length) return null;
   const start = new Date(year, month - 1, 1, 0, 0, 0);
   const end   = new Date(year, month, 0, 23, 59, 59);
@@ -831,7 +1205,21 @@ function getMonthConsumptionServer(meterKey, year, month) {
     const t = new Date(h.ts); return t >= start && t <= end && h.meterReading !== null;
   });
   if (!inMonth.length) return null;
-  const before   = hist.filter(h => new Date(h.ts) < start && h.meterReading !== null);
+
+  // Look for a baseline snapshot before the start of this month.
+  // First check within the same archive, then check previous month's archive.
+  let before = hist.filter(h => new Date(h.ts) < start && h.meterReading !== null);
+  if (!before.length) {
+    // Try previous month's archive as baseline source
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear  = month === 1 ? year - 1 : year;
+    const prevSrc   = (prevYear === cur.year && prevMonth === cur.month)
+      ? history
+      : loadArchive(prevYear, prevMonth);
+    const prevHist  = (prevSrc[meterKey] || []).filter(h => h.meterReading !== null);
+    if (prevHist.length) before = prevHist;
+  }
+
   const baseline = before.length ? before[before.length - 1] : inMonth[0];
   const latest   = inMonth[inMonth.length - 1];
   const consumed = Math.max(0, parseFloat(latest.meterReading) - parseFloat(baseline.meterReading));
@@ -1166,6 +1554,12 @@ function getNoConsumptionAlarmList() {
   return result;
 }
 
+
+// ── ENSURE history/ FOLDER EXISTS ──
+if (!fs.existsSync(CONFIG.historyDir)) {
+  fs.mkdirSync(CONFIG.historyDir, { recursive: true });
+  console.log(`[History] 📁 Created history folder: ${CONFIG.historyDir}`);
+}
 
 loadHistory();
 loadCustomers();
