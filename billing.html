@@ -437,6 +437,7 @@ setInterval(()=>{
 
 // ── INIT ──
 let historyData = {};
+let baseHistoryData = {}; // always holds current-month data
 let appData = {};
 let generatedBills = [];
 
@@ -465,6 +466,7 @@ async function loadData() {
     ]);
     appData = (await nodesRes.json()).applications || {};
     historyData = await histRes.json();
+    baseHistoryData = historyData; // keep current-month copy
     try { customersData = await custRes.json(); } catch(e) { customersData = {}; }
     document.getElementById('ebar').style.display = 'none';
     document.getElementById('conn-status').textContent = 'Connected';
@@ -573,13 +575,47 @@ function getMonthConsumption(meterKey, year, month) {
   };
 }
 
-function generateBills() {
+async function generateBills() {
   const month   = parseInt(document.getElementById('sel-month').value);
   const year    = parseInt(document.getElementById('sel-year').value);
   const selApp  = document.getElementById('sel-app').value;
   const dueDate = document.getElementById('due-date').value;
   const rates   = getRates();
   const monthNames = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // ── Fetch archive data for the selected month ──
+  const cur = new Date();
+  const curYear = cur.getFullYear();
+  const curMonth = cur.getMonth() + 1;
+  if (year !== curYear || month !== curMonth) {
+    // Past month — fetch from archive
+    try {
+      const monthStr = `${year}-${String(month).padStart(2,'0')}`;
+      const res = await fetch(`/api/history/archive/${monthStr}`);
+      if (res.ok) {
+        const archiveData = await res.json();
+        // Merge archive into historyData (archive takes priority for this month)
+        historyData = {};
+        const allKeys = new Set([...Object.keys(baseHistoryData), ...Object.keys(archiveData)]);
+        for (const key of allKeys) {
+          const base    = baseHistoryData[key] || [];
+          const archive = archiveData[key] || [];
+          const seen = new Set();
+          const merged = [];
+          for (const s of [...archive, ...base]) {
+            if (!seen.has(s.ts)) { seen.add(s.ts); merged.push(s); }
+          }
+          merged.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+          historyData[key] = merged;
+        }
+      }
+    } catch(e) {
+      console.warn('[Billing] Could not fetch archive:', e.message);
+    }
+  } else {
+    // Current month — use base data
+    historyData = baseHistoryData;
+  }
 
   // Collect all meters
   let allMeters = [];
