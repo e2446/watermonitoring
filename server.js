@@ -1377,10 +1377,11 @@ function createTransporter() {
   }
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    family: 4, // force IPv4 — Render free tier blocks IPv6 SMTP
-    auth: { user: cfg.user, pass: cfg.appPassword.replace(/\s/g, '') }
+    port: 587,
+    secure: false,       // STARTTLS — port 587 works on Render free tier
+    family: 4,           // force IPv4
+    auth: { user: cfg.user, pass: cfg.appPassword.replace(/\s/g, '') },
+    tls: { rejectUnauthorized: false }
   });
 }
 
